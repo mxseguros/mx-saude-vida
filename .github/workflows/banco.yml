@@ -32,7 +32,16 @@ on:
           - migrar          # aplica as migrations pendentes
           - semear          # migrations + seed.sql
           - rls             # roda o teste de RLS (transacional, faz rollback)
+          - acesso          # cria ou redefine o primeiro acesso da equipe
         default: status
+      email:
+        description: "So na acao `acesso`: o e-mail de quem vai entrar"
+        required: false
+        type: string
+      nome:
+        description: "So na acao `acesso`: o nome de quem vai entrar"
+        required: false
+        type: string
 
 concurrency:
   # Duas aplicacoes simultaneas no mesmo banco e como se perde o controle de
@@ -101,6 +110,25 @@ jobs:
         env:
           SUPABASE_DB_URL: ${{ inputs.ambiente == 'prod' && secrets.SUPABASE_DB_URL_PROD || secrets.SUPABASE_DB_URL_DEV }}
         run: psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f supabase/tests/rls.sql
+
+      # A SENHA vem de um secret, nunca de um input: input aparece no log, e o
+      # log do Actions em repositorio publico e publico. Secret o runner
+      # mascara sozinho.
+      - name: Criar o acesso
+        if: inputs.acao == 'acesso'
+        env:
+          SUPABASE_DB_URL: ${{ inputs.ambiente == 'prod' && secrets.SUPABASE_DB_URL_PROD || secrets.SUPABASE_DB_URL_DEV }}
+          SENHA: ${{ secrets.ACESSO_INICIAL_SENHA }}
+        run: |
+          if [ -z "$SENHA" ]; then
+            echo "::error::Falta o secret ACESSO_INICIAL_SENHA."
+            exit 1
+          fi
+          if [ -z "${{ inputs.email }}" ]; then
+            echo "::error::Informe o e-mail no campo email."
+            exit 1
+          fi
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1             -v email="'${{ inputs.email }}'"             -v senha="'$SENHA'"             -v nome="'${{ inputs.nome }}'"             -f scripts/criar-acesso.sql
 
       - name: Estado final das migrations
         if: always() && inputs.acao != 'status'
