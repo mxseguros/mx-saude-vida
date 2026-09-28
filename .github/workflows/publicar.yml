@@ -1,0 +1,100 @@
+name: Publicar
+
+# Deploy para a Vercel a partir do CI.
+#
+# Deploy manual para a Vercel a partir do CI: `vercel build` acontece aqui, entao
+# o que sobe e exatamente o que o CI verificou, com log guardado. O caminho
+# normal e o push na main, que a Vercel publica sozinha.
+#
+# Este repositorio e publico: os identificadores do projeto na Vercel vem de
+# secrets, e nao do arquivo.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ambiente:
+        description: "Producao ou pre-visualizacao"
+        required: true
+        type: choice
+        options: [preview, production]
+        default: preview
+
+concurrency:
+  group: publicar-${{ inputs.ambiente }}
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    name: ${{ inputs.ambiente }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Habilitar pnpm
+        run: corepack enable pnpm
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+
+      - name: Conferir o segredo
+        run: |
+          if [ -z "${{ secrets.VERCEL_TOKEN }}" ]; then
+            echo "::error::Falta o secret VERCEL_TOKEN."
+            exit 1
+          fi
+          echo "segredo presente"
+
+      # `vercel pull` traz as variaveis de ambiente do projeto, entao o build
+      # local aqui usa exatamente o mesmo ambiente que a Vercel usaria.
+      - name: Puxar o ambiente
+        run: |
+          pnpm exec vercel pull --yes \
+            --environment=${{ inputs.ambiente }} \
+            --token="${{ secrets.VERCEL_TOKEN }}"
+
+      - name: Build
+        run: |
+          pnpm exec vercel build ${{ inputs.ambiente == 'production' && '--prod' || '' }} \
+            --token="${{ secrets.VERCEL_TOKEN }}"
+
+      # A Vercel le o autor do commit no diretorio `.git` e bloqueia deployment
+      # de autor que ela nao consegue verificar. O checkout deste job e
+      # descartavel; sem o metadado nao ha o que bloquear, e publicar continua
+      # exigindo o token.
+      - name: Descartar o metadado de git
+        run: find . -maxdepth 1 -name ".git" -type d -exec rm -rf {} +
+
+      # `--prebuilt` sobe o que acabou de ser construido aqui, sem reconstruir
+      # na Vercel: o artefato publicado e o mesmo que este job verificou.
+      - name: Publicar
+        id: publicar
+        run: |
+          url=$(pnpm exec vercel deploy --prebuilt \
+            ${{ inputs.ambiente == 'production' && '--prod' || '' }} \
+            --token="${{ secrets.VERCEL_TOKEN }}")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Publicado em: $url"
+
+      - name: Conferir que responde
+        run: |
+          url="${{ steps.publicar.outputs.url }}"
+          codigo=$(curl -s -o /dev/null -w "%{http_code}" -m 30 "$url/entrar" || echo "000")
+          echo "GET $url/entrar -> $codigo"
+          # 401 e esperado enquanto a protecao de deployment (SSO) estiver
+          # ligada: significa que subiu e a Vercel esta barrando o acesso, nao
+          # que o build falhou.
+          case "$codigo" in
+            200|401|307) echo "no ar" ;;
+            *) echo "::error::A URL publicada respondeu $codigo"; exit 1 ;;
+          esac

@@ -1,0 +1,61 @@
+name: E2E
+
+# A suite de fumaca (Playwright): o limite de autenticacao, as telas de erro,
+# os cabecalhos de seguranca, o favicon. Sobe o build de producao sozinha e
+# nao fala com banco.
+#
+# Uma vez por dia na main, e sob demanda — nao a cada push. O CI de cada push
+# continua com lint, tipos, testes e build.
+
+on:
+  schedule:
+    # 09:00 UTC = 06h de Sao Paulo, antes de a equipe entrar.
+    - cron: "0 9 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: e2e-main
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: E2E (fumaca)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: https://exemplo.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: chave-de-ci
+      NEXT_PUBLIC_URL_BASE: http://localhost:3210
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Habilitar pnpm
+        run: corepack enable pnpm
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+
+      # So o chromium: o resto dos navegadores triplica o tempo do job e esta
+      # suite prova comportamento de servidor, nao de motor de renderizacao.
+      - name: Instalar o navegador
+        run: pnpm --filter @mx/saudevida-web exec playwright install --with-deps chromium
+
+      - name: E2E
+        run: pnpm --filter @mx/saudevida-web e2e
+
+      - name: Guardar o rastro em caso de falha
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: apps/web/playwright-report/
+          retention-days: 7

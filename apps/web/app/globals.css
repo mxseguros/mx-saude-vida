@@ -1,0 +1,516 @@
+@import "tailwindcss";
+
+/* ===========================================================================
+   MX SaúdeVida — tokens de design
+   Herdados do MX Sinistro; a referência de tela é o protótipo v0.8 do SaúdeVida.
+   Em qualquer duvida de cor, o prototipo vence o texto.
+
+   Tres estados de tema, e nesta ordem:
+     1. :root                                -> paleta clara completa
+     2. @media (prefers-color-scheme: dark)  -> guardado por
+        :root:not([data-theme="light"]) para a escolha explicita vencer o SO
+     3. :root[data-theme="dark"]             -> o alternador vence nos dois sentidos
+
+   Nenhuma cor pode ser definida SO dentro de um bloco de tema: token que nasce
+   dentro de media query nao existe no estado sem preferencia declarada — e o
+   estado sem preferencia declarada e o da maioria.
+
+   Decisao D2 do plano de execucao: as cores dos 30 status vem do legado e
+   incluem verde, ambar e vermelho. Elas NAO viram token de tema — ficam em
+   `statuses.color`, no banco, e so aparecem na barra do cabecalho da coluna e
+   no chip de status. Verde, ambar e vermelho como TOKEN sao exclusivos de
+   prazo e prioridade. Senao, no mesmo cartao, o ambar de "Aguardando Reparo"
+   briga com o ambar de "Vence em 2 dias" e a analista perde a leitura.
+   =========================================================================== */
+
+:root {
+  /* Marca */
+  --mx-navy: #071B34;
+  --mx-navy-2: #0F2A4E;
+  --mx-sky: #CAE3F7;
+  --mx-sage: #B0AF94;
+  --mx-offwhite: #FFFDFB;
+
+  /* Superficies */
+  --bg: #FFFDFB;
+  --surface: #FFFFFF;
+  --surface-2: #F6F4EF;
+  --surface-3: #ECEBE7;
+  --line: #DFDFDF;
+  --line-strong: #CBCAC5;
+
+  /* Texto */
+  --heading: #1B2430;
+  --text: #484848;
+  --muted: #5E6771;
+  --faint: #667080;
+
+  /* Acao */
+  --brand: #071B34;
+  --on-brand: #FFFFFF;
+  --brand-hover: #0F2A4E;
+  --accent-soft: #CAE3F7;
+  --on-accent-soft: #071B34;
+  --sage: #B0AF94;
+  --sage-soft: #E8E7DC;
+  --focus: #2F6FD1;
+
+  /* Semanticas — exclusivas de prazo e prioridade (decisao D2) */
+  --ok: #25683F;
+  --ok-soft: #E3F3E9;
+  --warn: #875810;
+  --warn-soft: #FBF0DA;
+  --bad: #B4332A;
+  --bad-soft: #FBE4E1;
+
+  /* Sugestao de IA: azul proprio, para nunca ser confundida com estado */
+  --ia: #1F5FA8;
+  --ia-soft: #E6F1FB;
+
+  --shadow-1: 0 1px 2px rgba(7, 27, 52, .06);
+  --shadow-2: 0 1px 2px rgba(7, 27, 52, .06), 0 6px 20px rgba(7, 27, 52, .06);
+  --shadow-3: 0 24px 60px rgba(7, 27, 52, .22);
+
+  --radius: 10px;
+  --radius-sm: 6px;
+
+  /* Menu lateral. Variavel, e nao utilitaria `w-[232px]`, porque a largura
+     muda por atributo no <html> e utilitaria vence CSS em camada — ver a
+     armadilha das camadas mais abaixo. Com variavel nao ha briga: a regra
+     so troca o valor. */
+  --largura-menu: 232px;
+
+  color-scheme: light;
+}
+
+/* Recolhido: trilho de icones. 56px cabe um alvo de toque de 40px com folga
+   nas laterais, e devolve 176px ao corpo — que na esteira de 17 colunas vale
+   mais de meia coluna a mais na tela. */
+:root[data-menu="recolhido"] {
+  --largura-menu: 56px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #05101F;
+    --surface: #0B1C33;
+    --surface-2: #12263F;
+    --surface-3: #1A3251;
+    --line: #1D3350;
+    --line-strong: #2E4A6B;
+
+    --heading: #EAF1F8;
+    --text: #C3D0DE;
+    --muted: #8698AC;
+    --faint: #8093A8;
+
+    --brand: #CAE3F7;
+    --on-brand: #071B34;
+    --brand-hover: #DDEDFA;
+    --accent-soft: #17324F;
+    --on-accent-soft: #CAE3F7;
+    --sage: #C4C3A8;
+    --sage-soft: #262A24;
+    --focus: #7FB2F0;
+
+    --ok: #5FBE85;
+    --ok-soft: #10301F;
+    --warn: #E0A24C;
+    --warn-soft: #37290F;
+    --bad: #E8735F;
+    --bad-soft: #3C1A16;
+
+    --ia: #8CBEF2;
+    --ia-soft: #12293F;
+
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, .35);
+    --shadow-2: 0 6px 20px rgba(0, 0, 0, .45);
+    --shadow-3: 0 24px 60px rgba(0, 0, 0, .6);
+
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #05101F;
+  --surface: #0B1C33;
+  --surface-2: #12263F;
+  --surface-3: #1A3251;
+  --line: #1D3350;
+  --line-strong: #2E4A6B;
+
+  --heading: #EAF1F8;
+  --text: #C3D0DE;
+  --muted: #8698AC;
+  --faint: #8093A8;
+
+  --brand: #CAE3F7;
+  --on-brand: #071B34;
+  --brand-hover: #DDEDFA;
+  --accent-soft: #17324F;
+  --on-accent-soft: #CAE3F7;
+  --sage: #C4C3A8;
+  --sage-soft: #262A24;
+  --focus: #7FB2F0;
+
+  --ok: #5FBE85;
+  --ok-soft: #10301F;
+  --warn: #E0A24C;
+  --warn-soft: #37290F;
+  --bad: #E8735F;
+  --bad-soft: #3C1A16;
+
+  --ia: #8CBEF2;
+  --ia-soft: #12293F;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .35);
+  --shadow-2: 0 6px 20px rgba(0, 0, 0, .45);
+  --shadow-3: 0 24px 60px rgba(0, 0, 0, .6);
+
+  color-scheme: dark;
+}
+
+/* ---------------------------------------------------------------------------
+   Ponte para o Tailwind: os tokens acima viram utilitarias (bg-surface,
+   text-heading, border-line...). `inline` faz a utilitaria apontar para a
+   variavel, entao trocar de tema nao exige reconstruir classe nenhuma.
+   --------------------------------------------------------------------------- */
+@theme inline {
+  --color-fundo: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+
+  --color-heading: var(--heading);
+  --color-texto: var(--text);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+
+  --color-brand: var(--brand);
+  --color-on-brand: var(--on-brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-on-accent-soft: var(--on-accent-soft);
+  --color-sage: var(--sage);
+  --color-sage-soft: var(--sage-soft);
+  --color-focus: var(--focus);
+
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+
+  --color-ia: var(--ia);
+  --color-ia-soft: var(--ia-soft);
+
+  --font-display: var(--fonte-titulo), ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-body: var(--fonte-texto), ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+
+  --radius-mx: var(--radius);
+  --radius-mx-sm: var(--radius-sm);
+
+  --shadow-mx-1: var(--shadow-1);
+  --shadow-mx-2: var(--shadow-2);
+  --shadow-mx-3: var(--shadow-3);
+}
+
+/* ---------------------------------------------------------------------------
+   Base
+   --------------------------------------------------------------------------- */
+/*
+ * TUDO daqui para baixo vive em @layer.
+ *
+ * CSS sem layer VENCE CSS em layer: uma regra solta como
+ * `h1 { color: var(--heading) }` sobrepoe toda utilitaria de cor do Tailwind.
+ * No MX Leads isso deixou um titulo navy sobre fundo navy, invisivel. Com as
+ * regras de elemento em `base` e as auxiliares em `components`, a ordem do
+ * Tailwind (theme, base, components, utilities) volta a valer.
+ */
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    /* O host pinta o fundo no tema DELE: corpo transparente empresta o fundo
+       errado. Por isso a cor vem sempre de token, nunca por omissao. */
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.6;
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3, h4, h5 {
+    font-family: var(--font-display);
+    color: var(--heading);
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  /* Anel de foco de 3px, visivel em todo controle, sem excecao. O board
+     precisa ser operavel so pelo teclado — e o portao da Fase 5. */
+  :focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: .01ms !important;
+      transition-duration: .01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* Data, placa, apolice e valor alinham por coluna */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Rotulo em caixa alta */
+  .rotulo {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 11px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Menu lateral retratil
+   ---------------------------------------------------------------------------
+   Tudo em `components` e SEM utilitaria concorrente no JSX para as
+   propriedades daqui (display, alinhamento, padding). As utilitarias do
+   Tailwind vivem numa camada posterior e venceriam — por isso o layout do
+   item de menu mora aqui inteiro, e o JSX so acrescenta cor.
+
+   O estado vem de `data-menu` no <html>, escrito pelo script do <head> antes
+   da hidratacao. Se dependesse do React, a sidebar abriria larga e encolheria
+   depois — um salto de layout a cada carregamento, na tela que a equipe abre
+   o dia todo.
+   --------------------------------------------------------------------------- */
+@layer components {
+  .menu-item {
+    display: flex;
+    align-items: center;
+    gap: .625rem;
+    padding: .5rem .75rem;
+    border-radius: 6px;
+    position: relative;
+    min-height: 38px;
+  }
+
+  :root[data-menu="recolhido"] .menu-item {
+    justify-content: center;
+    padding-inline: 0;
+  }
+
+  /* O que so existe com o menu aberto: rotulos, titulos de grupo, o seletor
+     de tema, o nome da pessoa. */
+  :root[data-menu="recolhido"] .menu-so-aberto {
+    display: none;
+  }
+
+  /* E o inverso: o monograma, que so aparece no trilho. Duas marcas para dois
+     espacos — o lockup em 56px ficaria ilegivel. */
+  .menu-so-recolhido {
+    display: none;
+  }
+
+  :root[data-menu="recolhido"] .menu-so-recolhido {
+    display: flex;
+    justify-content: center;
+  }
+
+  /* O contador vira medalha no canto do icone. Ele e a razao de o menu
+     recolhido ser um trilho e nao um sumico: "quantos abertos" e o que decide
+     para onde a analista vai.
+
+     O `box-shadow` desenha um anel na cor da propria sidebar: sem ele a
+     medalha fica POR CIMA do icone e os dois viram um borrao — foi o que a
+     primeira captura mostrou. O anel recorta um buraco limpo. */
+  :root[data-menu="recolhido"] .menu-contagem {
+    position: absolute;
+    top: 0;
+    right: 1px;
+    min-width: 15px;
+    text-align: center;
+    font-size: 9.5px;
+    font-weight: 700;
+    line-height: 14px;
+    padding: 0 3px;
+    border-radius: 999px;
+    color: #FFFFFF;
+    background: var(--mx-navy-2);
+    box-shadow: 0 0 0 2px var(--mx-navy);
+  }
+
+  /* Com atencao (17/09) a medalha e vermelha tambem no trilho. */
+  :root[data-menu="recolhido"] .menu-contagem[data-atencao="1"] {
+    background: var(--bad);
+  }
+
+  /* No trilho, o item ativo perde o rotulo em negrito — entao o unico sinal
+     de "voce esta aqui" e o fundo, e um fundo de 14% de opacidade some. Uma
+     barra na borda resolve sem competir com o icone. */
+  :root[data-menu="recolhido"] .menu-item[aria-current="page"] {
+    background: rgba(202, 227, 247, .18);
+  }
+
+  :root[data-menu="recolhido"] .menu-item[aria-current="page"]::before {
+    content: "";
+    position: absolute;
+    left: -8px;
+    top: 6px;
+    bottom: 6px;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--mx-sage);
+  }
+
+  /* Rodape empilhado no trilho. */
+  :root[data-menu="recolhido"] .menu-rodape {
+    align-items: center;
+  }
+  /* Sair e Recolher dividem a ultima linha; no trilho de 56px nao cabem
+     lado a lado e empilham. */
+  :root[data-menu="recolhido"] .menu-linha-final {
+    flex-direction: column;
+    align-items: stretch;
+    gap: .25rem;
+  }
+}
+
+/* Prosa da Ajuda (17/09): o HTML vem do markdown minimo, sem classe nenhuma,
+   entao o estilo dos elementos mora aqui, em camada, para nao vencer as
+   utilitarias do resto da tela. */
+@layer components {
+  .prosa h1 {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 800;
+    line-height: 1.2;
+    color: var(--heading);
+    margin: 0 0 6px;
+  }
+  .prosa h2 {
+    font-family: var(--font-display);
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.25;
+    color: var(--heading);
+    margin: 28px 0 8px;
+    scroll-margin-top: 24px;
+  }
+  .prosa h3 {
+    font-size: 14.5px;
+    font-weight: 700;
+    color: var(--heading);
+    margin: 18px 0 6px;
+  }
+  .prosa p {
+    font-size: 14px;
+    line-height: 1.6;
+    margin: 0 0 10px;
+  }
+  .prosa ul {
+    list-style: disc;
+    padding-left: 20px;
+    margin: 0 0 12px;
+  }
+  .prosa li {
+    font-size: 14px;
+    line-height: 1.6;
+    margin: 0 0 6px;
+  }
+  .prosa strong {
+    font-weight: 700;
+    color: var(--heading);
+  }
+  .prosa code {
+    font-size: 0.9em;
+    background: var(--surface-2);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+  .prosa a {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .prosa dd {
+    font-size: 13.5px;
+    line-height: 1.55;
+    margin: 0;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   A página do segurado (/coleta/<token>), em etapas — tokens do handoff (22/09)
+   ---------------------------------------------------------------------------
+   Escopados em `.coleta-publica` e FIXOS: não seguem o tema escuro, porque
+   nenhuma cor do handoff foi desenhada para ele. A fonte vem do layout da
+   rota (`--fonte-coleta`, `--fonte-mono`). */
+@layer components {
+  .coleta-publica {
+    --cp-navy: #071B34;
+    --cp-navy-2: #0F2A4E;
+    --cp-navy-3: #1B3D6B;
+    --cp-sky: #CAE3F7;
+    --cp-sky-soft: #EAF3FC;
+    --cp-sage: #B0AF94;
+    --cp-sage-soft: #F0EFE7;
+    --cp-ink: #484848;
+    --cp-ink-2: #6B6B6B;
+    --cp-black: #000000;
+    --cp-line: #DFDFDF;
+    --cp-line-soft: #ECECEC;
+    --cp-paper: #FFFDFB;
+    --cp-white: #FFFFFF;
+    --cp-err: #9A3B2A;
+    --cp-err-soft: #F8ECE8;
+    --cp-ok: #2F6A4E;
+    --cp-ok-soft: #E7F1EB;
+    font-family: var(--fonte-coleta), ui-sans-serif, system-ui, sans-serif;
+    color: var(--cp-ink);
+    background: var(--cp-paper);
+    color-scheme: light;
+  }
+  .coleta-publica input,
+  .coleta-publica button {
+    font-family: inherit;
+  }
+  .coleta-publica input::placeholder {
+    color: #8a8a8a;
+  }
+  .coleta-publica .cp-mono {
+    font-family: var(--fonte-mono), ui-monospace, monospace;
+    letter-spacing: 0.04em;
+  }
+  .coleta-publica .cp-input:focus {
+    border-color: var(--cp-navy);
+    box-shadow: 0 0 0 4px var(--cp-sky-soft);
+  }
+  .coleta-publica .cp-input[aria-invalid="true"]:focus {
+    box-shadow: 0 0 0 4px var(--cp-err-soft);
+  }
+  .coleta-publica .cp-progresso {
+    transition: width 400ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+}

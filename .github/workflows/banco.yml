@@ -1,0 +1,110 @@
+name: Banco
+
+# Aplica migrations e roda o teste de RLS a partir do CI, sob acionamento
+# manual.
+#
+# Pelo CI, e nao da maquina de quem desenvolve: a aplicacao de migration fica
+# reproduzivel e auditavel (quem disparou, quando, com log guardado), as
+# credenciais vivem em GitHub Secrets, e o runner ja vem com `psql`.
+#
+# Um projeto Supabase so (decisao de 28/09/2026): o ambiente `prod` e o palco
+# de ensaio ate o go-live. A opcao `dev` fica para o dia em que existir um
+# segundo projeto.
+#
+# Acionamento manual de proposito. `db push` aplica DDL; nada aqui roda por
+# push de codigo.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ambiente:
+        description: "Contra qual banco"
+        required: true
+        type: choice
+        options: [prod, dev]
+        default: prod
+      acao:
+        description: "O que fazer"
+        required: true
+        type: choice
+        options:
+          - status          # so lista o que ja foi aplicado
+          - migrar          # aplica as migrations pendentes
+          - semear          # migrations + seed.sql
+          - rls             # roda o teste de RLS (transacional, faz rollback)
+        default: status
+
+concurrency:
+  # Duas aplicacoes simultaneas no mesmo banco e como se perde o controle de
+  # qual migration entrou. Sem cancelamento: interromper um `db push` no meio
+  # e pior do que esperar.
+  group: banco-${{ inputs.ambiente }}
+  cancel-in-progress: false
+
+jobs:
+  executar:
+    name: ${{ inputs.acao }} · ${{ inputs.ambiente }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Habilitar pnpm
+        run: corepack enable pnpm
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+
+      # Diz contra o que vai rodar ANTES de rodar, sem vazar a senha. Saber que
+      # se esta apontando para producao e a diferenca entre um comando e um
+      # incidente.
+      - name: Conferir o alvo
+        env:
+          URL: ${{ inputs.ambiente == 'prod' && secrets.SUPABASE_DB_URL_PROD || secrets.SUPABASE_DB_URL_DEV }}
+        run: |
+          if [ -z "$URL" ]; then
+            echo "::error::Falta o secret SUPABASE_DB_URL_${{ inputs.ambiente == 'prod' && 'PROD' || 'DEV' }}."
+            exit 1
+          fi
+          echo "ambiente: ${{ inputs.ambiente }}"
+          echo "acao:     ${{ inputs.acao }}"
+          echo "host:     $(echo "$URL" | sed -E 's#.*@([^/]+)/.*#\1#')"
+
+      - name: Status
+        if: inputs.acao == 'status'
+        env:
+          SUPABASE_DB_URL: ${{ inputs.ambiente == 'prod' && secrets.SUPABASE_DB_URL_PROD || secrets.SUPABASE_DB_URL_DEV }}
+        run: node scripts/banco.mjs status
+
+      - name: Migrar
+        if: inputs.acao == 'migrar'
+        env:
+          SUPABASE_DB_URL: ${{ inputs.ambiente == 'prod' && secrets.SUPABASE_DB_URL_PROD || secrets.SUPABASE_DB_URL_DEV }}
+        run: node scripts/banco.mjs migrar
+
+      - name: Semear
+        if: inputs.acao == 'semear'
+        env:
+          SUPABASE_DB_URL: ${{ inputs.ambiente == 'prod' && secrets.SUPABASE_DB_URL_PROD || secrets.SUPABASE_DB_URL_DEV }}
+        run: node scripts/banco.mjs semear
+
+      # `psql` ja vem no runner. O teste roda inteiro numa transacao e faz
+      # rollback, entao nao deixa lixo nem em producao.
+      - name: Teste de RLS
+        if: inputs.acao == 'rls'
+        env:
+          SUPABASE_DB_URL: ${{ inputs.ambiente == 'prod' && secrets.SUPABASE_DB_URL_PROD || secrets.SUPABASE_DB_URL_DEV }}
+        run: psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f supabase/tests/rls.sql
+
+      - name: Estado final das migrations
+        if: always() && inputs.acao != 'status'
+        continue-on-error: true
+        env:
+          SUPABASE_DB_URL: ${{ inputs.ambiente == 'prod' && secrets.SUPABASE_DB_URL_PROD || secrets.SUPABASE_DB_URL_DEV }}
+        run: node scripts/banco.mjs status

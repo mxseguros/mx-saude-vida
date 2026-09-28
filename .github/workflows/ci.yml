@@ -1,0 +1,67 @@
+name: CI
+
+# O CI bloqueia merge.
+#
+# ATENCAO: para virar barreira de verdade, este job precisa ser marcado como
+# "required" em Settings > Branches > Branch protection rules > main. No MX
+# Leads o workflow rodava e nao bloqueava nada — verde e vermelho davam no
+# mesmo, e ninguem percebeu por semanas.
+#
+# O E2E (Playwright, ~5 min com navegador e build) roda em `e2e.yml`, uma vez
+# por dia na main e sob demanda. Antes de um push que mexe em tela, ele roda
+# LOCALMENTE (`corepack pnpm --filter @mx/saudevida-web e2e`).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verificar:
+    name: Lint, tipos, testes e build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      # O build do Next importa os modulos que leem ambiente. Valores de
+      # fachada: o CI nao fala com o Supabase, so precisa compilar.
+      NEXT_PUBLIC_SUPABASE_URL: https://exemplo.supabase.co
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: chave-de-ci
+      NEXT_PUBLIC_URL_BASE: http://localhost:3000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Habilitar pnpm
+        run: corepack enable pnpm
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+
+      # Vulnerabilidade alta em dependencia de producao derruba o CI no dia
+      # em que e publicada — nao numa analise meses depois (achado de 14/09:
+      # duas altas, uma num caminho que nem estava ligado).
+      - name: Auditoria de dependencias
+        run: pnpm audit --prod --audit-level high
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Tipos
+        run: pnpm typecheck
+
+      - name: Testes
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build

@@ -1,0 +1,34 @@
+{
+  "name": "mx-saude-vida",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Controle mensal de seguros saude, vida e odonto da MX Corretora de Seguros",
+  "packageManager": "pnpm@9.15.4",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "corepack pnpm --filter @mx/saudevida-web dev",
+    "build": "corepack pnpm --filter @mx/saudevida-web build",
+    "start": "corepack pnpm --filter @mx/saudevida-web start",
+    "lint": "corepack pnpm -r lint",
+    "typecheck": "corepack pnpm -r typecheck",
+    "test": "corepack pnpm -r test",
+    "teste:rls": "node scripts/banco.mjs rls",
+    "migrar": "node scripts/banco.mjs migrar",
+    "migrar:status": "node scripts/banco.mjs status",
+    "semear": "node scripts/banco.mjs semear"
+  },
+  "devDependencies": {
+    "@supabase/supabase-js": "^2.48.0",
+    "supabase": "^2.117.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vercel": "^59.14.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "postcss": ">=8.5.12"
+    }
+  }
+}

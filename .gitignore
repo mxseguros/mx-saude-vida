@@ -1,0 +1,63 @@
+# ---------------------------------------------------------------------------
+# ESTE REPOSITORIO E PUBLICO.
+#
+# Nenhum dado de cliente entra aqui: nome, CNPJ, CPF, e-mail, telefone,
+# planilha, apolice ou boleto. Uma vez commitado, o arquivo fica no historico
+# para sempre, e num repositorio publico o historico e de todo mundo.
+#
+# A pasta Docs/ guarda o material de trabalho (planilhas reais, apolices,
+# prototipos com nomes de clientes) e fica INTEIRA fora do git. A documentacao
+# que pode ser publica mora em documentacao/.
+# ---------------------------------------------------------------------------
+Docs/
+
+*.xlsx
+*.xls
+*.csv
+*.pdf
+*.docx
+
+# Dependencias
+node_modules/
+.pnpm-store/
+
+# Next.js
+.next/
+out/
+next-env.d.ts
+
+# Build
+dist/
+build/
+*.tsbuildinfo
+
+# Ambiente — nenhuma chave entra no repositorio
+.env
+.env.*
+!.env.example
+
+# Supabase CLI
+supabase/.branches/
+supabase/.temp/
+
+# Testes e cobertura
+coverage/
+playwright-report/
+test-results/
+
+# SEM barra no comeco: com "e2e/.sessao.json" o padrao ancora na raiz e nao
+# pega apps/web/e2e/. O arquivo guarda o cookie de sessao de quem rodou os
+# testes.
+**/e2e/.sessao.json
+
+# Vinculo do projeto na Vercel (projectId e orgId)
+.vercel/
+.vercel
+
+# Editor, assistente e sistema
+.vscode/
+.idea/
+.claude/
+.DS_Store
+Thumbs.db
+~$*
