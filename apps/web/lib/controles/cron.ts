@@ -12,7 +12,7 @@ import {
   type Passo,
 } from "../dominio/controle";
 import { competenciaDeHoje } from "../dominio/hoje";
-import { canaisPossiveis, montarMensagem, ROTULO_MODELO } from "../dominio/mensagem";
+import { canaisPossiveis, montarEmailDaMensagem, ROTULO_MODELO } from "../dominio/mensagem";
 import { nomeCurto } from "../dominio/cliente";
 import { enviarEmail } from "../email/enviar";
 import { registrarLog } from "../log";
@@ -245,11 +245,14 @@ async function enviarDoDia(
     return;
   }
 
-  const texto = montarMensagem(salvo.corpo, {
+  // Um contexto só para o corpo e para o assunto: com dois, um `{{data}}` no
+  // assunto renderizaria vazio enquanto o mesmo `{{data}}` no corpo aparecia.
+  const contexto = {
     cliente,
     gestor: linha.manager_name,
     competencia: competenciaDe(linha.competence),
-    data: datas[modelo === "informar" ? "informar" : modelo === "corte" ? "corte" : "vencimento"],
+    // A data "do momento" é a do passo que disparou a mensagem.
+    data: modelo === "corte" ? datas.corte : modelo === "vencimento" ? datas.vencimento : datas.informar,
     dataCorte: datas.corte,
     dataBoleto: datas.boleto,
     dataVencimento: datas.vencimento,
@@ -257,26 +260,18 @@ async function enviarDoDia(
     link: `${portal}/portal`,
     seguradora: linha.insurer_name,
     analista: linha.analyst_name,
-  });
+  };
+
+  const email = montarEmailDaMensagem(salvo, contexto);
+  // O WhatsApp leva o mesmo texto, sem o embrulho de HTML.
+  const texto = email.texto;
 
   if (canais.email && linha.manager_email) {
     const envio = await enviarEmail({
       para: [linha.manager_email],
-      assunto: montarMensagem(salvo.assunto, {
-        cliente,
-        gestor: linha.manager_name,
-        competencia: competenciaDe(linha.competence),
-        data: null,
-        dataCorte: datas.corte,
-        dataBoleto: datas.boleto,
-        dataVencimento: datas.vencimento,
-        valorDoBoleto: null,
-        link: "",
-        seguradora: linha.insurer_name,
-        analista: linha.analyst_name,
-      }),
+      assunto: email.assunto,
       texto,
-      html: `<pre style="font:15px/1.6 -apple-system,Segoe UI,Roboto,Arial,sans-serif;white-space:pre-wrap;margin:0">${escapar(texto)}</pre>`,
+      html: email.html,
     });
 
     if (envio.ok) resumo.emailsEnviados += 1;
@@ -289,11 +284,6 @@ async function enviarDoDia(
     await gravar(supabase, linha.id, modelo, "whatsapp", linha.manager_phone, texto, null, "pending");
     resumo.whatsappsPendentes += 1;
   }
-}
-
-/** Escapa o texto que vai para dentro do `<pre>` do e-mail. */
-function escapar(texto: string): string {
-  return texto.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 /**

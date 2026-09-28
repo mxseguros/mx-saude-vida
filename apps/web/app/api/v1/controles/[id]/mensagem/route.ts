@@ -1,10 +1,11 @@
 import { erroJson, exigirEscrita, lerCorpo } from "@/lib/api";
-import { lerControle } from "@/lib/controles/consulta";
+import { lerControle, listarModelos } from "@/lib/controles/consulta";
 import { registrarMensagem } from "@/lib/controles/servico";
 import { mensagemDoPasso } from "@/lib/dominio/controle";
-import { canaisPossiveis } from "@/lib/dominio/mensagem";
+import { canaisPossiveis, montarMensagem } from "@/lib/dominio/mensagem";
 import { enviarEmail } from "@/lib/email/enviar";
 import { ROTULO_MODELO } from "@/lib/dominio/mensagem";
+import { montarNotificacao } from "@/lib/dominio/email";
 import { nomeCurto } from "@/lib/dominio/cliente";
 
 /**
@@ -61,14 +62,39 @@ export async function POST(request: Request, contexto: { params: Promise<{ id: s
 
   if (canal === "email") {
     const cliente = nomeCurto({ razaoSocial: linha.razaoSocial, nomeFantasia: linha.nomeFantasia });
+
+    // O ASSUNTO vem do modelo salvo, e não do corpo da requisição: a analista
+    // edita o texto na janela, não o assunto, e deixar o cliente escolhê-lo
+    // seria uma porta para mandar qualquer coisa em nome da MX.
+    const modelos = await listarModelos();
+    const salvo = modelos.dados.find((m) => m.modelo === modelo);
+
+    const assunto = salvo
+      ? montarMensagem(salvo.assunto, {
+          cliente,
+          gestor: linha.gestorNome,
+          competencia: linha.competencia,
+          data: linha.datas.informar,
+          dataCorte: linha.datas.corte,
+          dataBoleto: linha.datas.boleto,
+          dataVencimento: linha.datas.vencimento,
+          valorDoBoleto: linha.valorDoBoleto,
+          link: "",
+          seguradora: linha.seguradora,
+          analista: linha.analista,
+        })
+      : `${ROTULO_MODELO[modelo]} · ${cliente}`;
+
+    // O corpo já vem renderizado da janela da analista: `montarNotificacao`
+    // aqui só embrulha no HTML com o cabeçalho da corretora — o mesmo que o
+    // cron manda, para o cliente não receber dois formatos.
+    const email = montarNotificacao({ assunto, corpo: texto }, {});
+
     const envio = await enviarEmail({
       para: [destino],
-      assunto: `${ROTULO_MODELO[modelo]} · ${cliente}`,
-      texto,
-      html: `<pre style="font:15px/1.6 -apple-system,Segoe UI,Roboto,Arial,sans-serif;white-space:pre-wrap;margin:0">${texto
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")}</pre>`,
+      assunto: email.assunto,
+      texto: email.texto,
+      html: email.html,
     });
 
     // `sem_provedor` não é erro de quem clicou: é configuração que falta, e a

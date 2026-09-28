@@ -5,6 +5,7 @@ import {
   linkWhatsapp,
   montarMensagem,
   variaveisDaMensagem,
+  variaveisComUmaChaveSo,
   variaveisInvalidas,
   VARIAVEIS_DA_MENSAGEM,
   type ContextoDaMensagem,
@@ -79,6 +80,30 @@ describe("montar a mensagem", () => {
   it("avisa quais variáveis do modelo não existem", () => {
     expect(variaveisInvalidas("{{gestor}}, veja {{link}} e {{cor_do_boleto}}")).toEqual(["cor_do_boleto"]);
     expect(variaveisInvalidas("{{gestor}} {{cliente}} {{motivo}}")).toEqual([]);
+  });
+
+  /**
+   * `{mes}` em vez de `{{mes}}` é o erro mais fácil de cometer e o mais difícil
+   * de ver: passa pela conferência de variável desconhecida, que só olha chave
+   * dupla, e chega escrito assim mesmo no celular do gestor.
+   */
+  it("acusa a variável escrita com uma chave só", () => {
+    expect(variaveisComUmaChaveSo("A movimentação de {mes} vence em {{data}}")).toEqual(["mes"]);
+    expect(variaveisComUmaChaveSo("Olá {gestor}, o boleto de {cliente} saiu")).toEqual(["gestor", "cliente"]);
+  });
+
+  it("não reclama do que está certo", () => {
+    expect(variaveisComUmaChaveSo("{{gestor}}, o corte é {{data_corte}}")).toEqual([]);
+  });
+
+  // Chave literal num texto qualquer não é variável esquecida. Reclamar dela
+  // ensinaria a ignorar o aviso.
+  it("ignora chave que não é nome de variável", () => {
+    expect(variaveisComUmaChaveSo("use {ok} e {qualquer_coisa}")).toEqual([]);
+  });
+
+  it("uma variável repetida aparece uma vez só", () => {
+    expect(variaveisComUmaChaveSo("{mes} e depois {mes}")).toEqual(["mes"]);
   });
 
   it("mantém parágrafo, mas não pilha de linhas em branco", () => {

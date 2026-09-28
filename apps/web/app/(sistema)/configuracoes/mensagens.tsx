@@ -12,6 +12,7 @@ import {
   ROTULO_CANAL,
   ROTULO_MODELO,
   VARIAVEIS_DA_MENSAGEM,
+  variaveisComUmaChaveSo,
   variaveisInvalidas,
   type Canal,
 } from "@/lib/dominio/mensagem";
@@ -115,6 +116,7 @@ function EditorDeModelo({ salvo }: { salvo: ModeloSalvo }) {
 
   const previa = useMemo(() => montarMensagem(corpo, EXEMPLO), [corpo]);
   const desconhecidas = useMemo(() => variaveisInvalidas(corpo), [corpo]);
+  const umaChaveSo = useMemo(() => variaveisComUmaChaveSo(corpo), [corpo]);
 
   const mudou = assunto !== salvo.assunto || corpo !== salvo.corpo || canal !== salvo.canalPadrao;
 
@@ -122,7 +124,7 @@ function EditorDeModelo({ salvo }: { salvo: ModeloSalvo }) {
   function inserir(variavel: string) {
     setErro(null);
     const area = document.getElementById("corpo-da-mensagem") as HTMLTextAreaElement | null;
-    const marca = `{${variavel}}`;
+    const marca = `{{${variavel}}}`;
 
     if (!area) {
       setCorpo(`${corpo}${marca}`);
@@ -146,7 +148,7 @@ function EditorDeModelo({ salvo }: { salvo: ModeloSalvo }) {
 
     if (desconhecidas.length) {
       setErro(
-        `O sistema não conhece ${desconhecidas.map((v) => `{${v}}`).join(", ")}. Corrija antes de salvar — sem tradução, isso sai literal para o cliente.`,
+        `O sistema não conhece ${desconhecidas.map((v) => `{{${v}}}`).join(", ")}. Corrija antes de salvar — sem tradução, isso sai literal para o cliente.`,
       );
       return;
     }
@@ -232,7 +234,7 @@ function EditorDeModelo({ salvo }: { salvo: ModeloSalvo }) {
                   onClick={() => inserir(v)}
                   className="tabular rounded-[5px] border border-line bg-surface-2 px-2 py-1 text-[11.5px] text-muted hover:border-brand hover:text-heading"
                 >
-                  {`{${v}}`}
+                  {`{{${v}}}`}
                 </button>
               ))}
             </div>
@@ -240,8 +242,16 @@ function EditorDeModelo({ salvo }: { salvo: ModeloSalvo }) {
 
           {desconhecidas.length ? (
             <p role="alert" className="rounded-[8px] border border-warn bg-warn-soft p-3 text-[13px] text-texto">
-              {desconhecidas.map((v) => `{${v}}`).join(", ")} não existe. Do jeito que está, isso sai literal na
+              {desconhecidas.map((v) => `{{${v}}}`).join(", ")} não existe. Do jeito que está, isso sai literal na
               mensagem do cliente.
+            </p>
+          ) : null}
+
+          {umaChaveSo.length ? (
+            <p role="alert" className="rounded-[8px] border border-warn bg-warn-soft p-3 text-[13px] text-texto">
+              {umaChaveSo.map((v) => `{${v}}`).join(", ")} está com UMA chave só. O sistema troca{" "}
+              {umaChaveSo.map((v) => `{{${v}}}`).join(", ")} — do jeito que está, sai escrito assim mesmo na
+              mensagem.
             </p>
           ) : null}
 

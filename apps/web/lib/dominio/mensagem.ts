@@ -1,4 +1,4 @@
-import { formatarData, renderizarTemplate, variaveisDesconhecidas, CORRETORA } from "./email";
+import { formatarData, montarNotificacao, renderizarTemplate, variaveisDesconhecidas, CORRETORA } from "./email";
 import { formatarMoeda } from "./mascaras";
 import { digitosDoTelefone } from "./telefone";
 import { nomeDoMes, type ModeloDeMensagem } from "./controle";
@@ -116,9 +116,53 @@ export function montarMensagem(modelo: string, contexto: ContextoDaMensagem): st
     .trim();
 }
 
+/**
+ * O e-mail pronto de uma mensagem do mês.
+ *
+ * Existe para que o cron e a tela da analista mandem o MESMO e-mail. Antes,
+ * cada um montava o seu `<pre>`, e o cliente recebia dois formatos diferentes
+ * dependendo de quem tinha apertado o botão.
+ *
+ * A montagem é em dois passos de propósito: `montarMensagem` troca as
+ * variáveis e apara o texto (buraco de variável vazia não pode virar
+ * pontuação solta), e `montarNotificacao` embrulha o resultado no HTML com o
+ * cabeçalho da corretora. O segundo passo recebe um texto que já não tem
+ * `{{...}}` nenhum, então não há o que trocar de novo.
+ */
+export function montarEmailDaMensagem(
+  modelo: { assunto: string; corpo: string },
+  contexto: ContextoDaMensagem,
+): { assunto: string; texto: string; html: string } {
+  return montarNotificacao(
+    {
+      assunto: montarMensagem(modelo.assunto, contexto),
+      corpo: montarMensagem(modelo.corpo, contexto),
+    },
+    {},
+  );
+}
+
 /** As variáveis do modelo que não existem — para recusar ao salvar. */
 export function variaveisInvalidas(modelo: string): string[] {
   return variaveisDesconhecidas(modelo, VARIAVEIS_DA_MENSAGEM);
+}
+
+/**
+ * As variáveis escritas com UMA chave em vez de duas: `{mes}` no lugar de
+ * `{{mes}}`.
+ *
+ * É o erro mais fácil de cometer e o mais difícil de ver: a mensagem parece
+ * certa na tela de edição, passa pela validação de variável desconhecida — que
+ * só olha `{{...}}` — e chega ao celular do gestor com `{mes}` escrito por
+ * extenso, no meio da frase.
+ *
+ * Só acusa nomes que EXISTEM. `{ok}` num texto qualquer é chave literal, e
+ * reclamar dela ensinaria a ignorar o aviso.
+ */
+export function variaveisComUmaChaveSo(modelo: string): string[] {
+  // `(?<!\{)\{` e `\}(?!\})` descartam o que já está entre chaves duplas.
+  const usadas = [...modelo.matchAll(/(?<!\{)\{\s*(\w+)\s*\}(?!\})/g)].map((m) => m[1] as string);
+  return [...new Set(usadas.filter((u) => (VARIAVEIS_DA_MENSAGEM as readonly string[]).includes(u)))];
 }
 
 /* --------------------------------------------------------------------------

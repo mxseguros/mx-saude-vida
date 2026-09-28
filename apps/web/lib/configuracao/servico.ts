@@ -4,7 +4,7 @@ import { clienteServidor } from "../supabase/servidor";
 import { clienteAdministrador } from "../supabase/administrador";
 import { deCanal, deModelo, dePapel } from "../dominio/mapear";
 import { problemaDaSenha } from "../dominio/senha";
-import { variaveisInvalidas, type Canal } from "../dominio/mensagem";
+import { variaveisComUmaChaveSo, variaveisInvalidas, type Canal } from "../dominio/mensagem";
 import type { ModeloDeMensagem } from "../dominio/controle";
 import type { Papel } from "../dominio/tipos";
 import type { Falha, ResultadoEscrita } from "../clientes/servico";
@@ -331,7 +331,19 @@ export async function salvarModelo(
       return falha(
         422,
         "variavel_desconhecida",
-        `O sistema não conhece ${desconhecidas.map((v) => `{${v}}`).join(", ")}. Sem tradução, isso sai literal na mensagem do cliente.`,
+        `O sistema não conhece ${desconhecidas.map((v) => `{{${v}}}`).join(", ")}. Sem tradução, isso sai literal na mensagem do cliente.`,
+        "corpo",
+      );
+    }
+
+    // `{mes}` em vez de `{{mes}}` passa pela conferência acima — ela só olha
+    // chave dupla — e chega inteiro ao celular do gestor.
+    const umaChaveSo = variaveisComUmaChaveSo(corpo);
+    if (umaChaveSo.length) {
+      return falha(
+        422,
+        "chave_faltando",
+        `${umaChaveSo.map((v) => `{${v}}`).join(", ")} está com uma chave só. Escreva ${umaChaveSo.map((v) => `{{${v}}}`).join(", ")}.`,
         "corpo",
       );
     }
