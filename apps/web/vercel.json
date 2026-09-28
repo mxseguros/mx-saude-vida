@@ -4,6 +4,12 @@
   "regions": [
     "gru1"
   ],
+  "crons": [
+    {
+      "path": "/api/cron/mensal",
+      "schedule": "0 10 * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",

@@ -13,7 +13,7 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
  * diferente conforme o navegador.
  */
 
-type Variante = "primario" | "secundario" | "suave" | "whatsapp" | "texto";
+type Variante = "primario" | "secundario" | "suave" | "whatsapp" | "perigo" | "texto";
 type Tamanho = "normal" | "grande";
 
 type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -35,6 +35,9 @@ const VARIANTES: Record<Variante, string> = {
     "bg-transparent text-heading border border-line-strong hover:bg-surface-2",
   suave: "bg-accent-soft text-on-accent-soft hover:brightness-95",
   whatsapp: "bg-[#1F7A55] text-white hover:brightness-110",
+  // Vermelho e o unico CTA fora da paleta MX, e so para o que nao se desfaz:
+  // excluir de vez, recusar. Se aparecer em acao comum, deixa de ser sinal.
+  perigo: "bg-bad text-white hover:brightness-110",
   texto: "bg-transparent text-muted hover:text-heading px-1",
 };
 

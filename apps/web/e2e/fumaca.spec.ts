@@ -46,6 +46,37 @@ test.describe("limite de autenticação", () => {
   });
 });
 
+/**
+ * O cron é uma porta aberta na internet com um segredo por fechadura, e roda
+ * com a chave que ignora a RLS. Se a fechadura parar de fechar, nada acusa:
+ * o job continua funcionando, só que para qualquer um que saiba a URL.
+ */
+test.describe("job mensal", () => {
+  test("sem segredo no cabeçalho, não roda", async ({ request }) => {
+    const resposta = await request.get("/api/cron/mensal");
+
+    // 401 com o segredo configurado, 503 sem ele. As duas recusam; o que não
+    // pode acontecer é 200.
+    expect([401, 503]).toContain(resposta.status());
+  });
+
+  test("segredo errado não passa", async ({ request }) => {
+    const resposta = await request.get("/api/cron/mensal", {
+      headers: { authorization: "Bearer segredo-errado-de-proposito" },
+    });
+    expect([401, 503]).toContain(resposta.status());
+  });
+
+  test("a recusa não conta nada sobre clientes", async ({ request }) => {
+    const resposta = await request.get("/api/cron/mensal");
+    const corpo = await resposta.text();
+
+    // O corpo da recusa não pode carregar contagem, nome nem competência: quem
+    // bate na porta errada não fica sabendo o que há atrás dela.
+    expect(corpo).not.toMatch(/competence|client|cliente|abertos|enviad/i);
+  });
+});
+
 test.describe("telas de erro", () => {
   test("404 é a nossa página, em português", async ({ page }) => {
     const resposta = await page.goto("/rota-que-nao-existe");

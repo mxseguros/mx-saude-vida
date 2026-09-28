@@ -1,0 +1,208 @@
+import "server-only";
+
+import { clienteServidor } from "../supabase/servidor";
+import { paraCanal, paraModelo, paraPasso } from "../dominio/mapear";
+import { competenciaDe, type DatasDoMes, type ModeloDeMensagem, type Passo } from "../dominio/controle";
+import type { Canal } from "../dominio/mensagem";
+import type { Produto } from "../dominio/cliente";
+import type { Resultado } from "../clientes/consulta";
+
+/**
+ * Leitura do Controle mensal.
+ *
+ * Uma linha por cliente por competência, lida da view `v_control_board` — que
+ * já junta cliente, seguradora, analista e a última mensagem. A view é
+ * `security_invoker`, então a RLS continua valendo: a equipe vê tudo, o
+ * cliente do portal veria só o dele.
+ */
+
+export type LinhaDoControle = {
+  id: string;
+  clienteId: string;
+  competencia: string;
+  passo: Passo;
+  datas: DatasDoMes;
+  protocolo: string | null;
+
+  razaoSocial: string;
+  nomeFantasia: string | null;
+  documento: string;
+  produto: Produto;
+  seguradora: string | null;
+  observacoes: string | null;
+
+  canal: Canal;
+  gestorNome: string | null;
+  gestorCelular: string | null;
+  gestorEmail: string | null;
+
+  analista: string | null;
+  semMudancas: boolean;
+  recebidaEm: string | null;
+  conferidaEm: string | null;
+  valorDoBoleto: number | null;
+  vencimentoDoBoleto: string | null;
+  pagaEm: string | null;
+
+  ultimaMensagem: { modelo: ModeloDeMensagem; canal: "email" | "whatsapp"; em: string } | null;
+};
+
+type LinhaDaView = {
+  id: string;
+  client_id: string;
+  competence: string;
+  step: string;
+  inform_date: string | null;
+  cutoff_date: string | null;
+  invoice_date: string;
+  due_date: string;
+  protocol: string | null;
+  no_changes: boolean;
+  received_at: string | null;
+  checked_at: string | null;
+  invoice_amount: string | number | null;
+  invoice_due: string | null;
+  paid_at: string | null;
+  legal_name: string;
+  trade_name: string | null;
+  document: string;
+  product: Produto;
+  channel: string;
+  manager_name: string | null;
+  manager_phone: string | null;
+  manager_email: string | null;
+  notes: string | null;
+  insurer_name: string | null;
+  analyst_name: string | null;
+  last_message_kind: string | null;
+  last_message_channel: string | null;
+  last_message_at: string | null;
+};
+
+function paraLinha(v: LinhaDaView): LinhaDoControle {
+  return {
+    id: v.id,
+    clienteId: v.client_id,
+    // A competência é o dia 1 no banco; aqui basta o mês.
+    competencia: competenciaDe(v.competence),
+    passo: paraPasso(v.step),
+    datas: {
+      informar: v.inform_date,
+      corte: v.cutoff_date,
+      boleto: v.invoice_date,
+      vencimento: v.due_date,
+    },
+    protocolo: v.protocol,
+    razaoSocial: v.legal_name,
+    nomeFantasia: v.trade_name,
+    documento: v.document,
+    produto: v.product,
+    seguradora: v.insurer_name,
+    observacoes: v.notes,
+    canal: paraCanal(v.channel),
+    gestorNome: v.manager_name,
+    gestorCelular: v.manager_phone,
+    gestorEmail: v.manager_email,
+    analista: v.analyst_name,
+    semMudancas: v.no_changes,
+    recebidaEm: v.received_at,
+    conferidaEm: v.checked_at,
+    valorDoBoleto: v.invoice_amount === null ? null : Number(v.invoice_amount),
+    vencimentoDoBoleto: v.invoice_due,
+    pagaEm: v.paid_at,
+    ultimaMensagem:
+      v.last_message_kind && v.last_message_at
+        ? {
+            modelo: paraModelo(v.last_message_kind),
+            canal: v.last_message_channel === "email" ? "email" : "whatsapp",
+            em: v.last_message_at,
+          }
+        : null,
+  };
+}
+
+/** A competência é guardada como o dia 1 do mês: `2026-09` vira `2026-09-01`. */
+export function primeiroDia(competencia: string): string {
+  return `${competencia}-01`;
+}
+
+export async function listarControles(competencia: string): Promise<Resultado<LinhaDoControle[]>> {
+  try {
+    const supabase = await clienteServidor();
+    const { data, error } = await supabase
+      .from("v_control_board")
+      .select("*")
+      .eq("competence", primeiroDia(competencia))
+      // Quem tem prazo mais curto primeiro. O desempate é o nome, para a
+      // ordem não dançar entre um carregamento e outro.
+      .order("inform_date", { ascending: true, nullsFirst: false })
+      .order("legal_name");
+
+    if (error) return { dados: [], erro: "Não foi possível carregar o Controle agora." };
+    return { dados: ((data ?? []) as unknown as LinhaDaView[]).map(paraLinha), erro: null };
+  } catch {
+    return { dados: [], erro: "Não foi possível falar com o banco de dados." };
+  }
+}
+
+export async function lerControle(id: string): Promise<Resultado<LinhaDoControle | null>> {
+  try {
+    const supabase = await clienteServidor();
+    const { data, error } = await supabase.from("v_control_board").select("*").eq("id", id).maybeSingle();
+
+    if (error) return { dados: null, erro: "Não foi possível carregar a movimentação." };
+    if (!data) return { dados: null, erro: null };
+    return { dados: paraLinha(data as unknown as LinhaDaView), erro: null };
+  } catch {
+    return { dados: null, erro: "Não foi possível falar com o banco de dados." };
+  }
+}
+
+/** As competências que já têm linha, da mais nova para a mais antiga. */
+export async function listarCompetencias(): Promise<Resultado<string[]>> {
+  try {
+    const supabase = await clienteServidor();
+    const { data, error } = await supabase
+      .from("monthly_controls")
+      .select("competence")
+      .order("competence", { ascending: false })
+      .limit(500);
+
+    if (error) return { dados: [], erro: null };
+    const meses = [...new Set(((data ?? []) as { competence: string }[]).map((l) => competenciaDe(l.competence)))];
+    return { dados: meses, erro: null };
+  } catch {
+    return { dados: [], erro: null };
+  }
+}
+
+export type ModeloSalvo = {
+  modelo: ModeloDeMensagem;
+  canalPadrao: Canal;
+  assunto: string;
+  corpo: string;
+};
+
+export async function listarModelos(): Promise<Resultado<ModeloSalvo[]>> {
+  try {
+    const supabase = await clienteServidor();
+    const { data, error } = await supabase
+      .from("message_templates")
+      .select("kind, default_channel, subject, body");
+
+    if (error) return { dados: [], erro: "Não foi possível carregar os modelos de mensagem." };
+
+    const linhas = (data ?? []) as { kind: string; default_channel: string; subject: string; body: string }[];
+    return {
+      dados: linhas.map((l) => ({
+        modelo: paraModelo(l.kind),
+        canalPadrao: paraCanal(l.default_channel),
+        assunto: l.subject,
+        corpo: l.body,
+      })),
+      erro: null,
+    };
+  } catch {
+    return { dados: [], erro: "Não foi possível carregar os modelos de mensagem." };
+  }
+}

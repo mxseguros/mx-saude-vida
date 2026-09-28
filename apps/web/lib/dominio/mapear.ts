@@ -5,7 +5,9 @@
  * a quebra acontece aqui e o compilador aponta o resto.
  */
 
+import type { Passo } from "./controle";
 import type { Canal } from "./mensagem";
+import type { ModeloDeMensagem } from "./controle";
 import type { Papel, Pessoa } from "./tipos";
 
 /* --------------------------------------------------------------------------
@@ -61,4 +63,68 @@ export function paraCanal(valor: string): Canal {
 
 export function deCanal(canal: Canal): "whatsapp" | "email" | "both" {
   return canal === "ambos" ? "both" : canal;
+}
+
+/* --------------------------------------------------------------------------
+   Passo do mes: `spreadsheet_received` no banco, `planilha_recebida` aqui
+   -------------------------------------------------------------------------- */
+
+const PASSO_DO_BANCO: Record<string, Passo> = {
+  inform: "informar",
+  spreadsheet_received: "planilha_recebida",
+  checked: "conferida",
+  cutoff: "corte",
+  invoice: "boleto",
+  due: "vencimento",
+  done: "concluida",
+};
+
+const PASSO_PARA_O_BANCO: Record<Passo, string> = {
+  informar: "inform",
+  planilha_recebida: "spreadsheet_received",
+  conferida: "checked",
+  corte: "cutoff",
+  boleto: "invoice",
+  vencimento: "due",
+  concluida: "done",
+};
+
+/**
+ * Passo desconhecido vira `informar`, o comeco do mes: um enum novo que o
+ * aplicativo ainda nao conhece nunca pode virar "concluida" e sumir da fila.
+ */
+export function paraPasso(valor: string): Passo {
+  return PASSO_DO_BANCO[valor] ?? "informar";
+}
+
+export function dePasso(passo: Passo): string {
+  return PASSO_PARA_O_BANCO[passo];
+}
+
+/* --------------------------------------------------------------------------
+   Modelo de mensagem: `correction` no banco, `correcao` aqui
+   -------------------------------------------------------------------------- */
+
+const MODELO_DO_BANCO: Record<string, ModeloDeMensagem> = {
+  inform: "informar",
+  cutoff: "corte",
+  invoice: "boleto",
+  due: "vencimento",
+  correction: "correcao",
+};
+
+const MODELO_PARA_O_BANCO: Record<ModeloDeMensagem, string> = {
+  informar: "inform",
+  corte: "cutoff",
+  boleto: "invoice",
+  vencimento: "due",
+  correcao: "correction",
+};
+
+export function paraModelo(valor: string): ModeloDeMensagem {
+  return MODELO_DO_BANCO[valor] ?? "informar";
+}
+
+export function deModelo(modelo: ModeloDeMensagem): string {
+  return MODELO_PARA_O_BANCO[modelo];
 }

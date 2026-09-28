@@ -294,6 +294,35 @@ export function mensagemDoPasso(passo: Passo): ModeloDeMensagem | null {
   return MENSAGEM_DO_PASSO[passo];
 }
 
+/**
+ * A mensagem que o CRON deve mandar hoje, ou `null`.
+ *
+ * Três diferenças em relação a `mensagemDoPasso`, e cada uma custou um erro
+ * para aparecer:
+ *
+ * 1. **O boleto não sai daqui.** Ele depende do arquivo que a analista anexa,
+ *    não de data: avisar "seu boleto está disponível" sem boleto nenhum é
+ *    pior que não avisar.
+ * 2. **A comparação é `>=`, não `===`.** Cron que não rodou num dia — deploy,
+ *    janela de manutenção, fuso — mandaria a mensagem nunca, em vez de mandar
+ *    no dia seguinte. Atrasado é recuperável; perdido não é.
+ * 3. **Não confere se já mandou.** Isso é do banco, por `(control_id, kind)`:
+ *    a decisão "o que cabe hoje" é de calendário e fica aqui, pura; a decisão
+ *    "isso já saiu" depende do que aconteceu e fica lá.
+ */
+export function mensagemDevida(passo: Passo, datas: DatasDoMes, hoje: string): ModeloDeMensagem | null {
+  if (passo === "informar") {
+    return datas.informar !== null && hoje >= datas.informar ? "informar" : null;
+  }
+  if (passo === "corte") {
+    return datas.corte !== null && hoje >= datas.corte ? "corte" : null;
+  }
+  // O passo só vira `vencimento` pelo avanço automático, que já conferiu a
+  // data: chegar aqui é a própria condição.
+  if (passo === "vencimento") return "vencimento";
+  return null;
+}
+
 export type ProximoPasso =
   | { tipo: "mensagem"; modelo: ModeloDeMensagem; rotulo: string }
   | { tipo: "conferir"; rotulo: string }

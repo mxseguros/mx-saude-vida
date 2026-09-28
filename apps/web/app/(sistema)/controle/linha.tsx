@@ -1,0 +1,97 @@
+import {
+  aparenciaDaData,
+  ROTULO_DATA,
+  ROTULO_PASSO,
+  type AparenciaDaData,
+  type ChaveDeData,
+  type Passo,
+} from "@/lib/dominio/controle";
+import { ROTULO_MODELO } from "@/lib/dominio/mensagem";
+import { nomeCurto } from "@/lib/dominio/cliente";
+import type { LinhaDoControle } from "@/lib/controles/consulta";
+
+/**
+ * As peças da linha do Controle, compartilhadas entre a tabela do desktop e o
+ * cartão do celular — as duas mostram a mesma coisa, e divergir aqui seria a
+ * versão do celular envelhecer sozinha.
+ */
+
+/**
+ * A cor de uma data.
+ *
+ * Prazo vencido é FONTE vermelha, nunca fundo vermelho: com quatro datas por
+ * linha e dezenas de linhas, fundo colorido vira uma parede que não se lê.
+ * Só a data do passo atual ganha cor; as cumpridas saem riscadas e as futuras
+ * em cinza, para o olho achar onde o mês está.
+ */
+const COR_DA_DATA: Record<AparenciaDaData, string> = {
+  sem_data: "text-faint",
+  cumprida: "text-faint line-through",
+  futura: "text-muted",
+  no_prazo: "font-[700] text-brand",
+  perto: "font-[700] text-warn",
+  hoje: "font-[700] text-bad",
+  vencido: "font-[700] text-bad",
+};
+
+const EXPLICACAO: Record<AparenciaDaData, string> = {
+  sem_data: "esta apólice não tem esta etapa",
+  cumprida: "já cumprida",
+  futura: "ainda vem",
+  no_prazo: "etapa atual, no prazo",
+  perto: "vence em até 3 dias",
+  hoje: "vence hoje",
+  vencido: "prazo vencido",
+};
+
+export function Data({ chave, linha, hoje }: { chave: ChaveDeData; linha: LinhaDoControle; hoje: string }) {
+  const valor = linha.datas[chave];
+  const aparencia = aparenciaDaData(chave, linha.passo, linha.datas, hoje);
+
+  return (
+    <span className={`tabular ${COR_DA_DATA[aparencia]}`} title={`${ROTULO_DATA[chave]}: ${EXPLICACAO[aparencia]}`}>
+      {valor ? `${valor.slice(8, 10)}/${valor.slice(5, 7)}` : "—"}
+    </span>
+  );
+}
+
+const COR_DO_PASSO: Record<Passo, string> = {
+  informar: "bg-surface-3 text-muted",
+  planilha_recebida: "bg-warn-soft text-warn",
+  conferida: "bg-accent-soft text-on-accent-soft",
+  corte: "bg-accent-soft text-on-accent-soft",
+  boleto: "bg-accent-soft text-on-accent-soft",
+  vencimento: "bg-accent-soft text-on-accent-soft",
+  concluida: "bg-ok-soft text-ok",
+};
+
+export function Etiqueta({ passo }: { passo: Passo }) {
+  return (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11.5px] font-[600] ${COR_DO_PASSO[passo]}`}
+    >
+      {ROTULO_PASSO[passo]}
+    </span>
+  );
+}
+
+export function Nome({ linha }: { linha: LinhaDoControle }) {
+  return (
+    <span className="font-[600] text-heading" title={linha.observacoes ?? undefined}>
+      {nomeCurto({ razaoSocial: linha.razaoSocial, nomeFantasia: linha.nomeFantasia })}
+    </span>
+  );
+}
+
+/** "22/09 · WhatsApp · Boleto", ou um travessão quando nada saiu ainda. */
+export function UltimaMensagem({ linha }: { linha: LinhaDoControle }) {
+  if (!linha.ultimaMensagem) return <span className="text-faint">—</span>;
+
+  const { em, canal, modelo } = linha.ultimaMensagem;
+  return (
+    <span className="text-muted">
+      {`${em.slice(8, 10)}/${em.slice(5, 7)}`} · {canal === "email" ? "e-mail" : "WhatsApp"} ·{" "}
+      {ROTULO_MODELO[modelo]}
+    </span>
+  );
+}

@@ -8,6 +8,7 @@ import {
   contarPrazos,
   dataEmFoco,
   datasDaCompetencia,
+  mensagemDevida,
   mensagemDoPasso,
   nomeDoMes,
   passoInicial,
@@ -211,6 +212,49 @@ describe("mensagem e próximo passo", () => {
     expect(proximoPasso("conferida").tipo).toBe("anexar_boleto");
     expect(proximoPasso("corte").tipo).toBe("anexar_boleto");
     expect(proximoPasso("concluida").tipo).toBe("nenhum");
+  });
+});
+
+describe("a mensagem que o cron manda hoje", () => {
+  it("no dia de informar, sai o aviso de informar", () => {
+    expect(mensagemDevida("informar", SETEMBRO, "2026-09-08")).toBe("informar");
+  });
+
+  it("antes do dia, não sai nada", () => {
+    expect(mensagemDevida("informar", SETEMBRO, "2026-09-07")).toBeNull();
+    expect(mensagemDevida("corte", SETEMBRO, "2026-09-09")).toBeNull();
+  });
+
+  // O cron que não rodou num dia — deploy, manutenção — tem que mandar
+  // atrasado, e não nunca.
+  it("depois do dia, ainda sai", () => {
+    expect(mensagemDevida("informar", SETEMBRO, "2026-09-11")).toBe("informar");
+    expect(mensagemDevida("corte", SETEMBRO, "2026-09-30")).toBe("corte");
+  });
+
+  it("o passo vencimento já é a própria condição", () => {
+    expect(mensagemDevida("vencimento", SETEMBRO, "2026-09-27")).toBe("vencimento");
+  });
+
+  // O boleto depende do arquivo que a analista anexa. Avisar "seu boleto está
+  // disponível" sem boleto nenhum é pior que não avisar.
+  it("o boleto NUNCA sai pelo cron", () => {
+    expect(mensagemDevida("boleto", SETEMBRO, "2026-09-16")).toBeNull();
+    expect(mensagemDevida("boleto", SETEMBRO, "2026-09-30")).toBeNull();
+  });
+
+  it("passo que espera gente não manda nada", () => {
+    for (const passo of ["planilha_recebida", "conferida", "concluida"] as const) {
+      expect(mensagemDevida(passo, SETEMBRO, "2026-09-30")).toBeNull();
+    }
+  });
+
+  // Apólice sem movimentação de vidas não tem "informar até" nem corte: as
+  // datas são nulas, e mensagem nenhuma pode sair delas.
+  it("apólice sem as datas de movimentação não dispara", () => {
+    const semMovimento = { ...SETEMBRO, informar: null, corte: null };
+    expect(mensagemDevida("informar", semMovimento, "2026-09-30")).toBeNull();
+    expect(mensagemDevida("corte", semMovimento, "2026-09-30")).toBeNull();
   });
 });
 
