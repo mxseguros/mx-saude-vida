@@ -5,6 +5,7 @@
  * a quebra acontece aqui e o compilador aponta o resto.
  */
 
+import type { Canal } from "./mensagem";
 import type { Papel, Pessoa } from "./tipos";
 
 /* --------------------------------------------------------------------------
@@ -46,4 +47,18 @@ export function paraPessoa(linha: LinhaPerfil | null): Pessoa | null {
     iniciais: linha.initials ?? "?",
     papel: paraPapel(linha.role),
   };
+}
+
+/* --------------------------------------------------------------------------
+   Canal de aviso: `both` no banco, `ambos` no aplicativo
+   -------------------------------------------------------------------------- */
+
+export function paraCanal(valor: string): Canal {
+  if (valor === "email") return "email";
+  if (valor === "both") return "ambos";
+  return "whatsapp";
+}
+
+export function deCanal(canal: Canal): "whatsapp" | "email" | "both" {
+  return canal === "ambos" ? "both" : canal;
 }

@@ -17,6 +17,7 @@ import { expect, test } from "@playwright/test";
 const PROTEGIDAS = [
   "/controle",
   "/clientes",
+  "/clientes/novo",
   "/configuracoes",
   // O portal do cliente também exige sessão: o que muda é o perfil de quem entra.
   "/portal",
