@@ -20,10 +20,18 @@ export const dynamic = "force-dynamic";
 export default async function Raiz() {
   const publico = await publicoDaSessao();
 
-  // `indisponivel` vai para o Controle de propósito: lá a moldura tem o
-  // tratamento de banco fora do ar, com a mensagem certa. Mandar para o login
-  // seria mentir sobre a causa.
   if (publico === "cliente") redirect("/portal");
   if (publico === "nenhum") redirect("/sem-acesso");
+
+  // Sem sessão vai direto ao login, e SEM `destino`: mandar para `/controle`
+  // faria dois saltos (`/` → `/controle` → `/entrar`) e, pior, gravaria
+  // `destino=/controle` para quem só digitou o domínio — depois de entrar, um
+  // gestor de cliente seria jogado numa tela que não é dele. Sem destino, o
+  // padrão é a raiz, e ela decide de novo com a sessão em mãos.
+  if (publico === "sem_sessao") redirect("/entrar");
+
+  // `indisponivel` vai para o Controle de propósito: lá a moldura tem o
+  // tratamento de banco fora do ar, com a mensagem certa. Mandar para o login
+  // seria mentir sobre a causa e oferecer uma porta que também não abriria.
   redirect("/controle");
 }

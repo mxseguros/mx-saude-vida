@@ -40,6 +40,13 @@ test.describe("limite de autenticação", () => {
     });
   }
 
+  /**
+   * A raiz decide o público (equipe → Controle, cliente → portal), então ela é
+   * a única rota que não dá para checar mais do que isto aqui: sem banco, esta
+   * suíte faz a raiz cair em "indisponível", e não em "sem sessão". Que ela
+   * mande ao login SEM `destino` — para um gestor de cliente não ser jogado no
+   * Controle depois de entrar — é conferido contra produção.
+   */
   test("a rota raiz não expõe nada sem sessão", async ({ page }) => {
     await page.goto("/");
     await expect(page).toHaveURL(/\/entrar/);
