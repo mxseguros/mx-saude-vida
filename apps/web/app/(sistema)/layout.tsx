@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { Moldura } from "@/app/_admin/moldura";
-import { situacaoDoAcesso } from "@/lib/supabase/servidor";
+import { situacaoDoAcesso, situacaoDoCliente } from "@/lib/supabase/servidor";
 
 /**
  * A moldura do sistema, num lugar só.
@@ -35,6 +35,13 @@ export default async function LayoutDoSistema({
   }
 
   if (acesso.estado === "sem_acesso") {
+    // Pode ser gestor de CLIENTE que digitou /controle, ou colou um link que a
+    // analista mandou. Ele tem sessão válida e lugar no sistema — só não é
+    // aqui. Mandar para /sem-acesso diria que o acesso dele acabou, o que é
+    // falso e gera ligação.
+    const cliente = await situacaoDoCliente();
+    if (cliente.estado === "ok") redirect("/portal");
+
     // NUNCA para /entrar: a sessão ainda é válida, o middleware devolveria a
     // pessoa para cá e o navegador acusaria "redirecionamentos demais".
     redirect("/sem-acesso");

@@ -124,3 +124,133 @@ export async function perfilAtual(): Promise<Pessoa | null> {
     return null;
   }
 }
+
+/* --------------------------------------------------------------------------
+   O SEGUNDO PÚBLICO: quem entra pelo portal do cliente
+   -------------------------------------------------------------------------- */
+
+/**
+ * Quem está logado no portal.
+ *
+ * Mesma sessão do Auth, tabela diferente: a equipe vive em `profiles`, o
+ * gestor do cliente em `client_users`. Uma pessoa está num ou no outro, nunca
+ * nos dois — e é isso que decide qual moldura ela vê.
+ */
+export type ClienteLogado = {
+  id: string;
+  nome: string;
+  iniciais: string;
+  telefone: string | null;
+  clienteId: string;
+  /** Razão social, para o cabeçalho e para a revisão do envio. */
+  razaoSocial: string;
+  nomeFantasia: string | null;
+  documento: string;
+};
+
+export type SituacaoDoCliente =
+  | { estado: "ok"; cliente: ClienteLogado }
+  | { estado: "sem_sessao" }
+  | { estado: "sem_acesso" }
+  | { estado: "indisponivel" };
+
+/**
+ * A situação de quem entrou pelo portal.
+ *
+ * A consulta junta `client_users` com `clients` porque as duas coisas tiram o
+ * acesso: usuário desativado e CLIENTE inativado. Inativar um cliente tem de
+ * fechar o portal de todos os gestores dele na hora — senão o contrato acaba e
+ * a pessoa continua enviando planilha para um mês que ninguém vai abrir.
+ *
+ * É a mesma pergunta que `client_id_of_user()` faz no banco. As duas camadas
+ * perguntam igual, de propósito.
+ */
+export async function situacaoDoCliente(): Promise<SituacaoDoCliente> {
+  let supabase;
+  try {
+    supabase = await clienteServidor();
+  } catch {
+    return { estado: "indisponivel" };
+  }
+
+  try {
+    const { data: sessao } = await supabase.auth.getUser();
+    if (!sessao.user) return { estado: "sem_sessao" };
+
+    const { data, error } = await supabase
+      .from("client_users")
+      .select("id, full_name, phone, active, clients(id, legal_name, trade_name, document, active, deleted_at)")
+      .eq("id", sessao.user.id)
+      .maybeSingle();
+
+    // Erro de consulta não é falta de acesso: o primeiro é o banco dizendo que
+    // não conseguiu, o segundo é "esta pessoa não é do portal".
+    if (error) return { estado: "indisponivel" };
+
+    const linha = data as unknown as {
+      id: string;
+      full_name: string;
+      phone: string | null;
+      active: boolean;
+      clients:
+        | { id: string; legal_name: string; trade_name: string | null; document: string; active: boolean; deleted_at: string | null }
+        | { id: string; legal_name: string; trade_name: string | null; document: string; active: boolean; deleted_at: string | null }[]
+        | null;
+    } | null;
+
+    if (!linha || !linha.active) return { estado: "sem_acesso" };
+
+    const empresa = Array.isArray(linha.clients) ? linha.clients[0] : linha.clients;
+    if (!empresa || !empresa.active || empresa.deleted_at) return { estado: "sem_acesso" };
+
+    return {
+      estado: "ok",
+      cliente: {
+        id: linha.id,
+        nome: linha.full_name,
+        iniciais: iniciaisDe(linha.full_name),
+        telefone: linha.phone,
+        clienteId: empresa.id,
+        razaoSocial: empresa.legal_name,
+        nomeFantasia: empresa.trade_name,
+        documento: empresa.document,
+      },
+    };
+  } catch {
+    return { estado: "indisponivel" };
+  }
+}
+
+/**
+ * As iniciais, calculadas aqui.
+ *
+ * `profiles.initials` é coluna gerada no banco; `client_users` não tem a
+ * coluna. Repetir a regra em SQL só para isso exigiria uma migration — e a
+ * regra é pequena o bastante para viver no mesmo lugar que a usa.
+ */
+function iniciaisDe(nome: string): string {
+  const partes = nome.trim().split(/\s+/);
+  const primeira = partes[0]?.[0] ?? "";
+  const segunda = partes.length > 1 ? (partes[partes.length - 1]?.[0] ?? "") : "";
+  return `${primeira}${segunda}`.toUpperCase() || "?";
+}
+
+/**
+ * Qual é o público de quem está logado.
+ *
+ * Uma consulta a cada tabela, e não uma adivinhação: é o que a raiz usa para
+ * mandar a pessoa ao lugar certo depois do login. A ordem importa pouco, mas
+ * `profiles` vem primeiro porque é a consulta que a equipe faz o dia inteiro.
+ */
+export async function publicoDaSessao(): Promise<"equipe" | "cliente" | "nenhum" | "sem_sessao" | "indisponivel"> {
+  const equipe = await situacaoDoAcesso();
+  if (equipe.estado === "ok") return "equipe";
+  if (equipe.estado === "sem_sessao") return "sem_sessao";
+  if (equipe.estado === "indisponivel") return "indisponivel";
+
+  const cliente = await situacaoDoCliente();
+  if (cliente.estado === "ok") return "cliente";
+  if (cliente.estado === "indisponivel") return "indisponivel";
+
+  return "nenhum";
+}

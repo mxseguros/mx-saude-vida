@@ -47,6 +47,42 @@ test.describe("limite de autenticação", () => {
 });
 
 /**
+ * As rotas do portal.
+ *
+ * Elas carregam a relação de vidas de uma empresa — nome, CPF e nascimento de
+ * cada funcionário. Se a guarda cair, nada dá erro: a resposta simplesmente
+ * passa a sair para quem não deveria.
+ */
+test.describe("API do portal", () => {
+  const ROTAS: { metodo: "GET" | "POST"; caminho: string }[] = [
+    { metodo: "POST", caminho: "/api/portal/planilha" },
+    { metodo: "POST", caminho: "/api/portal/envio" },
+    { metodo: "GET", caminho: "/api/portal/arquivo/00000000-0000-0000-0000-000000000000" },
+  ];
+
+  for (const rota of ROTAS) {
+    test(`${rota.caminho} exige sessão`, async ({ request }) => {
+      const resposta =
+        rota.metodo === "GET" ? await request.get(rota.caminho) : await request.post(rota.caminho, { data: {} });
+
+      // 401 quando há banco e não há sessão; 503 nesta suíte, que roda sem
+      // banco — a guarda não consegue nem perguntar quem é. As duas recusam, e
+      // a propriedade é que NENHUMA delas serve o conteúdo.
+      expect([401, 503]).toContain(resposta.status());
+      expect(resposta.ok()).toBe(false);
+    });
+  }
+
+  test("a recusa não conta nada sobre a empresa", async ({ request }) => {
+    const resposta = await request.post("/api/portal/envio", { data: { controle: "qualquer" } });
+    const corpo = await resposta.text();
+
+    // Quem bate na porta errada não fica sabendo o que há atrás dela.
+    expect(corpo).not.toMatch(/cnpj|razao|razão|planilha de|competence/i);
+  });
+});
+
+/**
  * O cron é uma porta aberta na internet com um segredo por fechadura, e roda
  * com a chave que ignora a RLS. Se a fechadura parar de fechar, nada acusa:
  * o job continua funcionando, só que para qualquer um que saiba a URL.

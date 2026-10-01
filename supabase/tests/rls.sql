@@ -289,6 +289,24 @@ select pg_temp.exigir_recusa(
   'cliente A enviou arquivo para o cliente B'
 );
 
+-- Nao escreve na linha do tempo. E por isso que o envio pelo portal passa pelo
+-- servidor com a chave de administracao (lib/portal/servico.ts): o cliente
+-- provoca o evento, mas nao e ele quem o grava.
+select pg_temp.exigir_recusa(
+  $$insert into control_events (control_id, type, origin, actor_client_user_id, from_step, to_step)
+    values ('c0000000-0000-0000-0000-00000000000a', 'spreadsheet_received', 'client',
+            'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'inform', 'spreadsheet_received')$$,
+  'cliente gravou evento na linha do tempo'
+);
+
+-- Nem se tentar se passar por alguem da equipe.
+select pg_temp.exigir_recusa(
+  $$insert into control_events (control_id, type, origin, actor_profile_id, from_step, to_step)
+    values ('c0000000-0000-0000-0000-00000000000a', 'checked', 'staff',
+            '11111111-1111-1111-1111-111111111111', 'spreadsheet_received', 'checked')$$,
+  'cliente gravou evento assinado pela equipe'
+);
+
 -- Nao envia boleto nem apolice: so planilha.
 select pg_temp.exigir_recusa(
   $$insert into client_files (client_id, kind, storage_path, original_name, size_bytes, mime, uploaded_by_client_user)

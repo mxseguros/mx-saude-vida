@@ -97,7 +97,7 @@ describe("destinoSeguro", () => {
       url.search = consulta;
 
       expect(url.origin).toBe("https://app.mx");
-      expect(url.href).toBe("https://app.mx/controle");
+      expect(url.href).toBe(`https://app.mx${DESTINO_PADRAO}`);
     });
   });
 });

@@ -21,7 +21,15 @@
  * Aqui as duas partes são separadas antes de qualquer atribuição.
  */
 
-export const DESTINO_PADRAO = "/controle";
+/**
+ * A RAIZ, e não `/controle`.
+ *
+ * O sistema tem dois públicos e `app/page.tsx` é quem decide entre eles. Um
+ * destino inválido levando direto ao Controle mandaria o gestor do cliente a
+ * uma tela que não é dele — e o fallback é justamente o caminho de quem veio
+ * com link estranho, que é quando acertar importa mais.
+ */
+export const DESTINO_PADRAO = "/";
 
 export type Destino = { caminho: string; consulta: string };
 
