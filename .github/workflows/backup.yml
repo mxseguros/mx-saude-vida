@@ -58,14 +58,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # O `pg_dump` do runner precisa ser >= ao servidor, senao ele recusa.
+      # O `pg_dump` do runner precisa ser >= ao servidor, senao ele RECUSA:
+      # "aborting because of server version mismatch". O runner vem com o
+      # cliente 16 e o Supabase e 17.6.
+      #
+      # Instalar o pacote 17 NAO basta: o `pg_dump` da 16 continua primeiro no
+      # PATH e e ele que roda. Por isso o diretorio da 17 vai para a FRENTE do
+      # PATH, e a versao e conferida aqui — descobrir isso no dump e descobrir
+      # tarde.
       - name: Instalar o cliente 17 do Postgres
         run: |
           sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
           curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
           sudo apt-get update -qq
           sudo apt-get install -y -qq postgresql-client-17
-          pg_dump --version
+
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+
+          VERSAO=$(/usr/lib/postgresql/17/bin/pg_dump --version | grep -oE '[0-9]+' | head -1)
+          echo "pg_dump: $(/usr/lib/postgresql/17/bin/pg_dump --version)"
+          if [ "$VERSAO" -lt 17 ]; then
+            echo "::error::O cliente 17 nao instalou; pg_dump ficou na $VERSAO."
+            exit 1
+          fi
 
       - name: Conferir o alvo
         run: |
