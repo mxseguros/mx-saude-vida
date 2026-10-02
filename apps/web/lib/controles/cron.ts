@@ -17,6 +17,7 @@ import { nomeCurto } from "../dominio/cliente";
 import { enviarEmail } from "../email/enviar";
 import { registrarLog } from "../log";
 import { abrirCompetencia } from "./servico";
+import { aplicarRetencao } from "./retencao";
 import { primeiroDia } from "./consulta";
 
 /**
@@ -40,6 +41,8 @@ export type ResumoDoDia = {
   emailsFalhos: number;
   whatsappsPendentes: number;
   semContato: number;
+  /** Arquivos com retencao vencida, apagados nesta rodada (LGPD art. 16). */
+  removidos: number;
 };
 
 type LinhaDoDia = {
@@ -85,6 +88,7 @@ export async function rodarODia(hoje: string, supabase: Cliente): Promise<Resumo
     emailsFalhos: 0,
     whatsappsPendentes: 0,
     semContato: 0,
+    removidos: 0,
   };
 
   const competencias = competenciasEmJogo(hoje);
@@ -172,6 +176,11 @@ export async function rodarODia(hoje: string, supabase: Cliente): Promise<Resumo
 
     await enviarDoDia(supabase, linha, datas, modelo, modelos, portal, resumo);
   }
+
+  // A retencao vem DEPOIS das mensagens: se ela estourar o tempo da funcao, o
+  // cliente ja foi avisado. Avisar e do dia; apagar arquivo vencido espera.
+  const retencao = await aplicarRetencao(supabase);
+  resumo.removidos = retencao.removidos;
 
   return resumo;
 }

@@ -1,0 +1,193 @@
+name: Backup
+
+# Backup do banco, com a RESTAURACAO PROVADA na mesma execucao.
+#
+# POR QUE A PROVA ESTA AQUI DENTRO. Um backup que nunca foi restaurado nao e um
+# backup, e uma esperanca. O dump pode sair truncado, com codificacao errada ou
+# sem uma extensao, e nada disso aparece ate a hora em que ele e necessario —
+# que e a pior hora possivel para descobrir.
+#
+# Entao toda execucao: dumpa, restaura num Postgres DESCARTAVEL dentro do
+# runner, e CONFERE AS CONTAGENS. Se a contagem nao casar, o job falha.
+#
+# O arquivo e cifrado antes de virar artefato. Dump do MX SaudeVida tem nome,
+# CPF e nascimento de funcionario de cliente; artefato de Actions em repositorio
+# publico e baixavel por qualquer pessoa com o link.
+
+on:
+  schedule:
+    # 03h BRT. Depois do cron das 07h do dia anterior e antes do expediente.
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+    inputs:
+      guardar:
+        description: "Guardar o artefato cifrado (padrao: so prova e descarta)"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    name: dump, restaura e confere
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    # O Postgres descartavel da prova. Versao 17 para casar com o Supabase.
+    services:
+      prova:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: prova
+          POSTGRES_DB: prova
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5432:5432
+
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL_PROD }}
+      DESTINO: postgresql://postgres:prova@localhost:5432/prova
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # O `pg_dump` do runner precisa ser >= ao servidor, senao ele recusa.
+      - name: Instalar o cliente 17 do Postgres
+        run: |
+          sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17
+          pg_dump --version
+
+      - name: Conferir o alvo
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then
+            echo "::error::Falta o secret SUPABASE_DB_URL_PROD."
+            exit 1
+          fi
+          if [ -z "${{ secrets.BACKUP_PASSPHRASE }}" ]; then
+            echo "::error::Falta o secret BACKUP_PASSPHRASE. O dump tem dado pessoal e nao sai em claro."
+            exit 1
+          fi
+          echo "host: $(echo "$SUPABASE_DB_URL" | sed -E 's#.*@([^/]+)/.*#\1#')"
+
+      # `--no-owner` e `--no-privileges` porque os papeis do Supabase
+      # (authenticated, service_role, supabase_admin) nao existem no Postgres
+      # descartavel — sem isso a restauracao falha em cada GRANT.
+      - name: Dump
+        run: |
+          pg_dump "$SUPABASE_DB_URL" \
+            --format=custom \
+            --no-owner --no-privileges \
+            --schema=public \
+            --file=dump.pgcustom
+          ls -lh dump.pgcustom
+
+      - name: Restaurar no Postgres descartavel
+        run: |
+          # `--single-transaction` para a prova ser tudo-ou-nada: restauracao
+          # parcial que "quase deu" e o pior resultado possivel aqui.
+          pg_restore \
+            --dbname="$DESTINO" \
+            --no-owner --no-privileges \
+            --single-transaction \
+            dump.pgcustom
+          echo "restaurado"
+
+      # A PROVA. Conta as linhas das tabelas que importam nos dois lados e
+      # exige igualdade. Dump truncado passa pelo `pg_restore` sem erro; o que
+      # ele nao passa e por esta conferencia.
+      - name: Conferir as contagens
+        run: |
+          TABELAS="clients insurers monthly_controls control_events messages message_templates client_files client_users profiles policies retention_rules"
+          FALHOU=0
+
+          for T in $TABELAS; do
+            ORIGEM=$(psql "$SUPABASE_DB_URL" -tAc "select count(*) from public.$T" 2>/dev/null || echo "ERRO")
+            COPIA=$(psql "$DESTINO" -tAc "select count(*) from public.$T" 2>/dev/null || echo "ERRO")
+
+            if [ "$ORIGEM" = "ERRO" ] || [ "$COPIA" = "ERRO" ]; then
+              echo "::error::$T: nao consegui contar (origem=$ORIGEM copia=$COPIA)"
+              FALHOU=1
+            elif [ "$ORIGEM" != "$COPIA" ]; then
+              echo "::error::$T: origem tem $ORIGEM e a copia tem $COPIA"
+              FALHOU=1
+            else
+              echo "$T: $ORIGEM"
+            fi
+          done
+
+          # Uma tabela vazia em TODO lugar e suspeito: significa que o dump
+          # pegou o schema e nenhum dado.
+          TOTAL=$(psql "$DESTINO" -tAc "select count(*) from public.clients")
+          if [ "$TOTAL" -eq 0 ]; then
+            echo "::error::A copia nao tem nenhum cliente. O dump trouxe schema sem dado."
+            FALHOU=1
+          fi
+
+          if [ "$FALHOU" -ne 0 ]; then
+            echo "::error::A restauracao NAO confere. Este backup nao serve."
+            exit 1
+          fi
+          echo "A restauracao confere."
+
+      # As views e a RLS tambem precisam voltar: elas sao o que impede um
+      # cliente de ver o outro, e um backup que perde politica restaura um banco
+      # aberto.
+      - name: Conferir views e politicas
+        run: |
+          VIEWS=$(psql "$DESTINO" -tAc "select count(*) from pg_views where schemaname='public'")
+          POLITICAS=$(psql "$DESTINO" -tAc "select count(*) from pg_policies where schemaname='public'")
+          echo "views: $VIEWS · politicas: $POLITICAS"
+
+          if [ "$VIEWS" -lt 3 ]; then
+            echo "::error::A copia tem $VIEWS views. Esperado pelo menos 3."
+            exit 1
+          fi
+          if [ "$POLITICAS" -lt 20 ]; then
+            echo "::error::A copia tem $POLITICAS politicas de RLS. O backup perdeu a seguranca do banco."
+            exit 1
+          fi
+
+      - name: Cifrar
+        if: inputs.guardar
+        run: |
+          # AES-256 com a senha vinda de secret. `-pbkdf2` com iteracoes altas
+          # porque a senha e humana e o arquivo pode ficar guardado por meses.
+          openssl enc -aes-256-cbc -pbkdf2 -iter 600000 -salt \
+            -in dump.pgcustom \
+            -out "backup-$(date -u +%Y%m%d).pgcustom.enc" \
+            -pass env:SENHA
+          rm dump.pgcustom
+          ls -lh *.enc
+        env:
+          SENHA: ${{ secrets.BACKUP_PASSPHRASE }}
+
+      - name: Guardar o artefato cifrado
+        if: inputs.guardar
+        uses: actions/upload-artifact@v4
+        with:
+          name: backup-cifrado
+          path: "*.pgcustom.enc"
+          retention-days: 30
+          if-no-files-found: error
+
+      # Sem `guardar`, o dump morre com o runner. O padrao e PROVAR que o
+      # backup funciona, nao acumular copia de dado pessoal em artefato.
+      - name: Resumo
+        if: always()
+        run: |
+          {
+            echo "### Backup do MX SaudeVida"
+            echo ""
+            echo "- Dump e restauracao conferidos contra um Postgres descartavel."
+            echo "- Artefato guardado: ${{ inputs.guardar && 'sim, cifrado' || 'nao (so a prova)' }}"
+          } >> "$GITHUB_STEP_SUMMARY"
