@@ -6,9 +6,14 @@ import { CHAVES_DE_DATA, contarPrazos, ROTULO_DATA, rotuloDaCompetencia } from "
 import { competenciaDeHoje, hojeSaoPaulo } from "@/lib/dominio/hoje";
 import { ROTULO_CANAL } from "@/lib/dominio/mensagem";
 
+import { montarAgenda, type MesParaAgenda } from "@/lib/dominio/atividade";
+import { nomeCurto } from "@/lib/dominio/cliente";
+
 import { AbrirMes } from "./abrir-mes";
 import { Acoes } from "./acoes";
+import { VistaMes, VistaSemana } from "./agenda";
 import { Data, Etiqueta, Nome, UltimaMensagem } from "./linha";
+import { SeletorDeVista, type Vista } from "./seletor-de-vista";
 
 export const metadata: Metadata = { title: "Controle mensal" };
 
@@ -25,14 +30,36 @@ export const metadata: Metadata = { title: "Controle mensal" };
 export default async function PaginaControle({
   searchParams,
 }: {
-  searchParams: Promise<{ mes?: string }>;
+  searchParams: Promise<{ mes?: string; vista?: string; dia?: string }>;
 }) {
-  const { mes } = await searchParams;
+  const { mes, vista, dia } = await searchParams;
   const competencia = /^\d{4}-\d{2}$/.test(mes ?? "") ? (mes as string) : competenciaDeHoje();
   const hoje = hojeSaoPaulo();
 
+  // Vista e dia vêm da URL, então vêm de fora: valor estranho cai na Lista e
+  // num dia nulo, em vez de quebrar a tela.
+  const atual: Vista = vista === "mes" || vista === "semana" ? vista : "lista";
+  const diaEscolhido = /^\d{4}-\d{2}-\d{2}$/.test(dia ?? "") ? (dia as string) : null;
+
   const [controle, modelos] = await Promise.all([listarControles(competencia), listarModelos()]);
   const contagem = contarPrazos(controle.dados, hoje);
+
+  // A agenda é derivada das MESMAS linhas da Lista — nenhuma consulta a mais, e
+  // nenhum lugar onde os dois possam discordar sobre o estado de um mês.
+  const agenda = montarAgenda(
+    controle.dados.map(
+      (linha): MesParaAgenda => ({
+        id: linha.id,
+        cliente: nomeCurto({ razaoSocial: linha.razaoSocial, nomeFantasia: linha.nomeFantasia }),
+        seguradora: linha.seguradora,
+        analista: linha.analista,
+        passo: linha.passo,
+        datas: linha.datas,
+        acompanhaPagamento: linha.acompanhaPagamento,
+      }),
+    ),
+    hoje,
+  );
 
   const tiles = [
     { valor: contagem.vencidos, rotulo: contagem.vencidos === 1 ? "segurado com prazo vencido" : "segurados com prazo vencido", cor: "text-bad" },
@@ -46,7 +73,12 @@ export default async function PaginaControle({
       <TopoPagina
         titulo={`Controle de ${rotuloDaCompetencia(competencia).toLowerCase()}`}
         contagem={controle.dados.length ? `${controle.dados.length} segurados` : undefined}
-        acoes={<AbrirMes competencia={competencia} />}
+        acoes={
+          <span className="flex flex-wrap items-center gap-2.5">
+            <SeletorDeVista competencia={competencia} atual={atual} />
+            <AbrirMes competencia={competencia} />
+          </span>
+        }
       />
 
       <div className="flex flex-col gap-4 p-4 sm:p-6">
@@ -94,6 +126,16 @@ export default async function PaginaControle({
               </div>
             </div>
 
+            {/* Mês e Semana: os mesmos dados virados de lado — uma atividade
+                por data, em vez de uma linha por cliente com quatro datas. */}
+            {atual === "mes" ? (
+              <VistaMes competencia={competencia} atividades={agenda} hoje={hoje} diaEscolhido={diaEscolhido} />
+            ) : atual === "semana" ? (
+              <VistaSemana competencia={competencia} atividades={agenda} hoje={hoje} diaEscolhido={diaEscolhido} />
+            ) : null}
+
+            {atual === "lista" ? (
+              <>
             {/* Desktop: tabela de largura fixa, sem rolagem lateral. */}
             <div className="hidden overflow-hidden rounded-[10px] border border-line bg-surface lg:block">
               <table className="w-full table-fixed border-collapse text-[12.5px]">
@@ -188,11 +230,15 @@ export default async function PaginaControle({
                 </li>
               ))}
             </ul>
+              </>
+            ) : null}
 
-            <p className="text-[12.5px] leading-relaxed text-muted">
-              Todo mês o sistema abre uma linha por segurado e envia a primeira mensagem no dia configurado no
-              cadastro. Passe o mouse numa data para saber o que a cor quer dizer.
-            </p>
+            {atual === "lista" ? (
+              <p className="text-[12.5px] leading-relaxed text-muted">
+                Todo mês o sistema abre uma linha por segurado e envia a primeira mensagem no dia configurado no
+                cadastro. Passe o mouse numa data para saber o que a cor quer dizer.
+              </p>
+            ) : null}
           </>
         ) : null}
 
