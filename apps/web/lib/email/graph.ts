@@ -91,6 +91,16 @@ export async function enviarPeloGraph(
             body: { contentType: "HTML", content: mensagem.html },
             toRecipients: mensagem.para.map((address) => ({ emailAddress: { address } })),
             ...(responderPara ? { replyTo: [{ emailAddress: { address: responderPara } }] } : {}),
+            ...(mensagem.anexos?.length
+              ? {
+                  attachments: mensagem.anexos.map((anexo) => ({
+                    "@odata.type": "#microsoft.graph.fileAttachment",
+                    name: anexo.nome,
+                    contentType: anexo.tipo,
+                    contentBytes: anexo.conteudo,
+                  })),
+                }
+              : {}),
           },
           // Fica em "Itens enviados" da caixa: a equipe consegue ver o que o
           // sistema mandou sem abrir o sistema.

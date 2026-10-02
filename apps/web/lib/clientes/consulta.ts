@@ -5,6 +5,7 @@ import { normalizarDocumento } from "../dominio/documento";
 import { paraCanal } from "../dominio/mapear";
 import type { Produto } from "../dominio/cliente";
 import type { Canal } from "../dominio/mensagem";
+import { competenciaDe } from "../dominio/controle";
 
 /**
  * Leitura de clientes.
@@ -200,5 +201,130 @@ export async function listarSeguradoras(): Promise<Resultado<Seguradora[]>> {
     };
   } catch {
     return { dados: [], erro: "Lista de seguradoras indisponível." };
+  }
+}
+
+/* --------------------------------------------------------------------------
+   O acervo de um cliente, para a ficha dele
+   -------------------------------------------------------------------------- */
+
+export type DocumentoDoAcervo = {
+  id: string;
+  tipo: "planilha" | "boleto" | "apolice";
+  nome: string;
+  tamanho: number | null;
+  criadoEm: string;
+  competencia: string | null;
+  protocolo: string | null;
+};
+
+const TIPO_DO_ARQUIVO: Record<string, DocumentoDoAcervo["tipo"]> = {
+  spreadsheet: "planilha",
+  invoice: "boleto",
+  policy: "apolice",
+};
+
+/**
+ * Tudo o que existe de arquivo deste cliente, do mais novo para o mais antigo.
+ *
+ * Lê `v_client_documents`, a mesma view do portal — a equipe vê por `clients`,
+ * o cliente por `client_id_of_user()`, e a RLS resolve a diferença. Duas
+ * consultas diferentes para a mesma lista divergiriam na primeira mudança.
+ */
+export async function listarAcervo(clienteId: string): Promise<Resultado<DocumentoDoAcervo[]>> {
+  try {
+    const supabase = await clienteServidor();
+
+    const { data, error } = await supabase
+      .from("v_client_documents")
+      .select("id, kind, original_name, size_bytes, created_at, competence, protocol")
+      .eq("client_id", clienteId)
+      .order("created_at", { ascending: false })
+      .limit(300);
+
+    if (error) return { dados: [], erro: "Não foi possível carregar os documentos." };
+
+    const linhas = (data ?? []) as unknown as {
+      id: string;
+      kind: string;
+      original_name: string;
+      size_bytes: number | null;
+      created_at: string;
+      competence: string | null;
+      protocol: string | null;
+    }[];
+
+    return {
+      dados: linhas.map((l) => ({
+        id: l.id,
+        tipo: TIPO_DO_ARQUIVO[l.kind] ?? "planilha",
+        nome: l.original_name,
+        tamanho: l.size_bytes,
+        criadoEm: l.created_at,
+        competencia: l.competence ? competenciaDe(l.competence) : null,
+        protocolo: l.protocol,
+      })),
+      erro: null,
+    };
+  } catch {
+    return { dados: [], erro: "Não foi possível falar com o banco de dados." };
+  }
+}
+
+export type BoletoDoCliente = {
+  controleId: string;
+  competencia: string;
+  parcela: string | null;
+  valor: number | null;
+  vencimento: string | null;
+  pagaEm: string | null;
+  arquivoId: string | null;
+};
+
+/**
+ * Os boletos do cliente, mês a mês.
+ *
+ * Vem de `monthly_controls` e não dos arquivos: um mês pode ter valor e
+ * vencimento registrados sem o PDF — a analista lança o que a seguradora
+ * informou por e-mail e anexa depois. Listar pelos arquivos esconderia esses.
+ */
+export async function listarBoletos(clienteId: string): Promise<Resultado<BoletoDoCliente[]>> {
+  try {
+    const supabase = await clienteServidor();
+
+    const { data, error } = await supabase
+      .from("monthly_controls")
+      .select("id, competence, invoice_installment, invoice_amount, invoice_due, paid_at, invoice_file_id")
+      .eq("client_id", clienteId)
+      .not("invoice_attached_at", "is", null)
+      .order("competence", { ascending: false })
+      .limit(60);
+
+    if (error) return { dados: [], erro: "Não foi possível carregar os boletos." };
+
+    const linhas = (data ?? []) as {
+      id: string;
+      competence: string;
+      invoice_installment: string | null;
+      invoice_amount: string | number | null;
+      invoice_due: string | null;
+      paid_at: string | null;
+      invoice_file_id: string | null;
+    }[];
+
+    return {
+      dados: linhas.map((l) => ({
+        controleId: l.id,
+        competencia: competenciaDe(l.competence),
+        parcela: l.invoice_installment,
+        valor: l.invoice_amount === null ? null : Number(l.invoice_amount),
+        vencimento: l.invoice_due,
+        pagaEm: l.paid_at,
+        arquivoId: l.invoice_file_id,
+      })),
+      erro: null,
+    };
+  } catch {
+    return { dados: [], erro: "Não foi possível falar com o banco de dados." };
   }
 }

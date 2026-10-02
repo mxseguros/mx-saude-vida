@@ -126,7 +126,13 @@ export function AnexarBoleto({ linha, rotulo }: { linha: LinhaDoControle; rotulo
         return;
       }
 
-      aviso.mostrar(`Boleto de ${cliente} anexado. A mensagem de boleto já pode sair.`);
+      const envio = json?.data?.envio as { email: boolean; whatsapp: boolean; aviso: string | null } | undefined;
+      aviso.mostrar(
+        envio?.aviso ??
+          (envio?.email
+            ? `Boleto de ${cliente} anexado e enviado por e-mail, com o PDF em anexo.`
+            : `Boleto de ${cliente} anexado.`),
+      );
       setAberto(false);
       limpar();
       router.refresh();
@@ -293,7 +299,8 @@ export function AnexarBoleto({ linha, rotulo }: { linha: LinhaDoControle; rotulo
 
           <p className="rounded-[8px] bg-surface-2 px-3 py-2.5 text-[12.5px] leading-relaxed text-texto">
             Ao salvar, o boleto vai para Meus documentos do cliente e a movimentação avança. A mensagem de boleto
-            sai pelo canal dele — pelo botão da linha, ou sozinha se for e-mail.
+            sai na hora pelo canal dele: por e-mail, com o PDF em anexo; por WhatsApp, fica pronta para você abrir
+            no botão da linha.
           </p>
 
           <Aviso estado={aviso.estado} onFechar={aviso.fechar} />

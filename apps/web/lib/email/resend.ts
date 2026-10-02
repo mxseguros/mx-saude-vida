@@ -32,6 +32,14 @@ export async function enviarPeloResend(
         html: mensagem.html,
         text: mensagem.texto,
         reply_to: mensagem.responderPara ?? provedor.responderPara ?? undefined,
+        ...(mensagem.anexos?.length
+          ? {
+              attachments: mensagem.anexos.map((anexo) => ({
+                filename: anexo.nome,
+                content: anexo.conteudo,
+              })),
+            }
+          : {}),
       }),
       // Sem timeout, a rota fica pendurada e a analista não sabe se enviou.
       signal: AbortSignal.timeout(LIMITE_MS),

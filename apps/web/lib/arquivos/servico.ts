@@ -2,6 +2,7 @@ import "server-only";
 
 import { clienteServidor } from "../supabase/servidor";
 import { caminhoDoArquivo, conferirArquivo, type TipoDeArquivo } from "../dominio/arquivo";
+import { ANEXO_MAXIMO, type Anexo } from "../email/tipos";
 import type { Falha, ResultadoEscrita } from "../clientes/servico";
 
 /**
@@ -213,5 +214,34 @@ export async function baixarArquivo(
     return { ok: true, dados: { arquivo, nome: linha.original_name } };
   } catch {
     return falha(503, "sem_banco", "Não foi possível falar com o servidor.");
+  }
+}
+
+/**
+ * O arquivo como ANEXO de e-mail, em base64.
+ *
+ * Só para o boleto: "seu boleto está disponível" com o PDF junto poupa o
+ * cliente de entrar no portal para baixar 20 KB.
+ *
+ * Devolve `null` em vez de falhar quando o arquivo não serve de anexo — grande
+ * demais, ausente, ilegível. A mensagem é mais importante que o anexo: avisar
+ * sem o PDF é útil, e não avisar porque o PDF não caberia não é.
+ */
+export async function anexoDeEmail(arquivoId: string): Promise<Anexo | null> {
+  const baixado = await baixarArquivo(arquivoId);
+  if (!baixado.ok) return null;
+
+  const { arquivo } = baixado.dados;
+  if (arquivo.size <= 0 || arquivo.size > ANEXO_MAXIMO) return null;
+
+  try {
+    const bytes = Buffer.from(await arquivo.arrayBuffer());
+    return {
+      nome: arquivo.name,
+      tipo: arquivo.type || "application/pdf",
+      conteudo: bytes.toString("base64"),
+    };
+  } catch {
+    return null;
   }
 }

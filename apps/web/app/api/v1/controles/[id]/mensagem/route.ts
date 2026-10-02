@@ -4,6 +4,7 @@ import { registrarMensagem } from "@/lib/controles/servico";
 import { mensagemDoPasso } from "@/lib/dominio/controle";
 import { canaisPossiveis, montarMensagem } from "@/lib/dominio/mensagem";
 import { enviarEmail } from "@/lib/email/enviar";
+import { anexoDeEmail } from "@/lib/arquivos/servico";
 import { ROTULO_MODELO } from "@/lib/dominio/mensagem";
 import { montarNotificacao } from "@/lib/dominio/email";
 import { nomeCurto } from "@/lib/dominio/cliente";
@@ -90,11 +91,18 @@ export async function POST(request: Request, contexto: { params: Promise<{ id: s
     // cron manda, para o cliente não receber dois formatos.
     const email = montarNotificacao({ assunto, corpo: texto }, {});
 
+    // A mensagem de BOLETO leva o PDF junto: o cliente recebe o documento no
+    // e-mail em vez de ter que entrar no portal para baixar 20 KB. Anexo que
+    // nao da para montar nao impede o envio — avisar sem o PDF e util.
+    const anexo =
+      modelo === "boleto" && linha.boletoArquivoId ? await anexoDeEmail(linha.boletoArquivoId) : null;
+
     const envio = await enviarEmail({
       para: [destino],
       assunto: email.assunto,
       texto: email.texto,
       html: email.html,
+      ...(anexo ? { anexos: [anexo] } : {}),
     });
 
     // `sem_provedor` não é erro de quem clicou: é configuração que falta, e a

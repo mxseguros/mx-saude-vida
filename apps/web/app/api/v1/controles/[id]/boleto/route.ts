@@ -2,6 +2,7 @@ import { erroJson, exigirEscrita } from "@/lib/api";
 import { lerControle } from "@/lib/controles/consulta";
 import { aplicarAcaoNoControle } from "@/lib/controles/servico";
 import { lerPdfDoBoleto } from "@/lib/controles/boleto";
+import { enviarMensagemDoPasso } from "@/lib/controles/envio";
 import { enviarArquivo } from "@/lib/arquivos/servico";
 import { podeAgir } from "@/lib/dominio/controle";
 import { hojeSaoPaulo } from "@/lib/dominio/hoje";
@@ -136,5 +137,13 @@ export async function POST(request: Request, contexto: { params: Promise<{ id: s
     return erroJson(status, codigo, mensagem);
   }
 
-  return Response.json({ data: resultado.dados }, { status: 201 });
+  // Avisa o cliente AGORA, com o PDF junto. A janela promete "salvar e avisar o
+  // cliente", e promessa de tela que o código não cumpre é defeito.
+  //
+  // Nunca derruba a resposta: anexar deu certo, e perder isso porque o
+  // provedor de e-mail está fora seria trocar trabalho feito por nada. O aviso
+  // volta no corpo e a tela mostra.
+  const envio = await enviarMensagemDoPasso(id, "boleto", sessao.perfil.id);
+
+  return Response.json({ data: { ...resultado.dados, envio } }, { status: 201 });
 }
