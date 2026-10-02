@@ -120,6 +120,33 @@ jobs:
           psql "$DESTINO" -v ON_ERROR_STOP=1 -c "drop schema if exists public cascade"
           psql "$DESTINO" -tAc "select count(*) from pg_tables where schemaname='public'"
 
+      # As EXTENSOES nao vem no dump limitado ao schema `public`, e sem elas a
+      # restauracao para: `clients.manager_email` e `citext`, e o tipo nao
+      # existe num Postgres recem-criado.
+      #
+      # A lista e DESCOBERTA na origem, nao escrita aqui: uma lista fixa
+      # envelheceria calada no dia em que alguem usasse uma extensao nova, e o
+      # backup voltaria a nao ser provado sem ninguem notar.
+      #
+      # Falha ao criar uma extensao e TOLERADA: o Supabase tem varias que nao
+      # existem no Postgres de baunilha (pg_graphql, pgsodium, supabase_vault) e
+      # que o schema `public` nao usa. Se faltar alguma que o schema USA, a
+      # restauracao falha logo depois e diz qual — que e a mensagem certa.
+      - name: Recriar as extensoes na prova
+        run: |
+          psql "$SUPABASE_DB_URL" -tAc             "select extname from pg_extension where extname <> 'plpgsql'" > extensoes.txt
+
+          echo "extensoes na origem: $(wc -l < extensoes.txt)"
+
+          while read -r EXT; do
+            [ -z "$EXT" ] && continue
+            if psql "$DESTINO" -q -c "create extension if not exists \"$EXT\" cascade" 2>/dev/null; then
+              echo "  ok      $EXT"
+            else
+              echo "  pulada  $EXT (nao existe neste Postgres)"
+            fi
+          done < extensoes.txt
+
       - name: Restaurar no Postgres descartavel
         run: |
           # `--single-transaction` para a prova ser tudo-ou-nada: restauracao
