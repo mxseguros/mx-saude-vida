@@ -197,7 +197,13 @@ async function avancarPasso(
     origin: "system",
     from_step: dePasso(de),
     to_step: dePasso(para),
-    note: "Avanço automático pela data.",
+    // O motivo importa na linha do tempo: "fechou porque a seguradora cobra
+    // direto" e "avançou porque a data chegou" são coisas diferentes, e quem
+    // for conferir o mês meses depois não tem como adivinhar qual foi.
+    note:
+      para === "concluida"
+        ? "Mês fechado: a seguradora cobra direto."
+        : "Avanço automático pela data.",
   });
 
   if (erroEvento) {
