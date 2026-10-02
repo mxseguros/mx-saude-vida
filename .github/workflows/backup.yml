@@ -73,8 +73,12 @@ jobs:
             echo "::error::Falta o secret SUPABASE_DB_URL_PROD."
             exit 1
           fi
-          if [ -z "${{ secrets.BACKUP_PASSPHRASE }}" ]; then
-            echo "::error::Falta o secret BACKUP_PASSPHRASE. O dump tem dado pessoal e nao sai em claro."
+          # A senha e exigida SO quando o artefato vai ser guardado. O caminho
+          # padrao — provar e descartar — nunca cifra nada, e travar a prova
+          # diaria num secret que ela nao usa faria o backup deixar de ser
+          # provado justamente por falta de uma senha que nao fazia falta.
+          if [ "${{ inputs.guardar }}" = "true" ] && [ -z "${{ secrets.BACKUP_PASSPHRASE }}" ]; then
+            echo "::error::Guardar o artefato exige BACKUP_PASSPHRASE: o dump tem dado pessoal e nao sai em claro."
             exit 1
           fi
           echo "host: $(echo "$SUPABASE_DB_URL" | sed -E 's#.*@([^/]+)/.*#\1#')"
