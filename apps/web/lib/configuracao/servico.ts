@@ -90,14 +90,15 @@ export async function criarPessoa(
   const problema = problemaDaSenha(senha);
   if (problema) return falha(422, "senha_fraca", problema, "senha");
 
+  let contaId: string | null = null;
+
   try {
     const admin = clienteAdministrador();
-    const { error } = await admin.auth.admin.createUser({
+    const { data: criada, error } = await admin.auth.admin.createUser({
       email: endereco,
       password: senha,
       // Já nasce confirmado, senão a pessoa não entra no primeiro acesso.
       email_confirm: true,
-      // O gatilho `handle_new_user` lê estes dois para montar o perfil.
       user_metadata: { full_name: nome.trim(), role: dePapel(papel) },
     });
 
@@ -108,8 +109,35 @@ export async function criarPessoa(
       return falha(500, "criacao_falhou", "Não foi possível criar o acesso.");
     }
 
+    contaId = criada.user?.id ?? null;
+    if (!contaId) return falha(500, "criacao_falhou", "Não foi possível criar o acesso.");
+
+    // A LINHA EM `profiles` E EXPLICITA, e nao de um gatilho.
+    //
+    // O comentario anterior aqui prometia um `handle_new_user` lendo os
+    // metadados — ele existe no MX Sinistro e NUNCA veio para este repositorio.
+    // O resultado era um acesso que entrava e caia em /sem-acesso: conta no
+    // Auth, nenhuma linha em `profiles`, e nada acusando. Vai pelo cliente da
+    // SESSAO porque a politica e `profiles_insert_admin`.
+    const supabase = await clienteServidor();
+    const { error: erroPerfil } = await supabase.from("profiles").insert({
+      id: contaId,
+      full_name: nome.trim(),
+      role: dePapel(papel),
+      active: true,
+    });
+
+    if (erroPerfil) {
+      // Conta no Auth sem perfil e uma pessoa que entra e nao alcanca nada.
+      await admin.auth.admin.deleteUser(contaId).catch(() => null);
+      return falha(500, "perfil_falhou", "Não foi possível criar o perfil. Tente de novo.");
+    }
+
     return { ok: true, dados: null };
   } catch {
+    if (contaId) {
+      await clienteAdministrador().auth.admin.deleteUser(contaId).catch(() => null);
+    }
     return falha(503, "sem_chave", "Criar acesso exige a chave de administração configurada.");
   }
 }

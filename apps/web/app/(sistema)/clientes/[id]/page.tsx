@@ -3,15 +3,21 @@ import { notFound } from "next/navigation";
 
 import { TopoPagina } from "@/app/_admin/moldura";
 import { lerCliente, listarSeguradoras } from "@/lib/clientes/consulta";
+import { listarAcessos } from "@/lib/clientes/acesso";
 import { nomeCurto } from "@/lib/dominio/cliente";
 
 import { FormularioCliente } from "../formulario";
+import { AcessoAoPortal } from "./acesso-ao-portal";
 
 export const metadata: Metadata = { title: "Cliente" };
 
 export default async function PaginaCliente({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [cliente, seguradoras] = await Promise.all([lerCliente(id), listarSeguradoras()]);
+  const [cliente, seguradoras, acessos] = await Promise.all([
+    lerCliente(id),
+    listarSeguradoras(),
+    listarAcessos(id),
+  ]);
 
   // Erro de banco e cliente inexistente merecem telas diferentes: mandar os
   // dois para o 404 esconde instabilidade atras de "nao encontrado".
@@ -38,8 +44,20 @@ export default async function PaginaCliente({ params }: { params: Promise<{ id: 
       />
 
       <div className="p-4 sm:p-6">
-        <div className="mx-auto max-w-[840px]">
+        <div className="mx-auto flex max-w-[840px] flex-col gap-4">
           <FormularioCliente cliente={cliente.dados} seguradoras={seguradoras.dados} />
+
+          {/* Depois do formulário de propósito: o acesso ao portal é consequência
+              do cadastro, e quem abre esta tela quase sempre vem conferir ou
+              corrigir um campo, não dar acesso. */}
+          <AcessoAoPortal
+            clienteId={id}
+            acessos={acessos.dados}
+            nomeDoCliente={nomeCurto(cliente.dados)}
+            nomeDoGestor={cliente.dados.gestorNome}
+            emailDoGestor={cliente.dados.gestorEmail}
+            celularDoGestor={cliente.dados.gestorCelular}
+          />
         </div>
       </div>
     </>

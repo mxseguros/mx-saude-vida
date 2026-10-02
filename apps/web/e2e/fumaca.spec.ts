@@ -67,6 +67,8 @@ test.describe("API do portal", () => {
     { metodo: "GET", caminho: "/api/portal/arquivo/00000000-0000-0000-0000-000000000000" },
   ];
 
+  const VAZIO = "00000000-0000-0000-0000-000000000000";
+
   for (const rota of ROTAS) {
     test(`${rota.caminho} exige sessão`, async ({ request }) => {
       const resposta =
@@ -86,6 +88,28 @@ test.describe("API do portal", () => {
 
     // Quem bate na porta errada não fica sabendo o que há atrás dela.
     expect(corpo).not.toMatch(/cnpj|razao|razão|planilha de|competence/i);
+  });
+});
+
+/**
+ * Criar acesso ao portal é da EQUIPE, e cria conta no Auth.
+ *
+ * Se a guarda cair, qualquer pessoa cria login de cliente — e um login de
+ * cliente alcança a relação de vidas de uma empresa.
+ */
+test.describe("acesso ao portal", () => {
+  const CLIENTE = "00000000-0000-0000-0000-000000000000";
+
+  test("criar acesso exige sessão", async ({ request }) => {
+    const resposta = await request.post(`/api/v1/clientes/${CLIENTE}/acesso`, { data: {} });
+    expect([401, 503]).toContain(resposta.status());
+    expect(resposta.ok()).toBe(false);
+  });
+
+  test("trocar senha de um acesso exige sessão", async ({ request }) => {
+    const resposta = await request.patch(`/api/v1/clientes/${CLIENTE}/acesso/${CLIENTE}`, { data: { senha: "x" } });
+    expect([401, 503]).toContain(resposta.status());
+    expect(resposta.ok()).toBe(false);
   });
 });
 
