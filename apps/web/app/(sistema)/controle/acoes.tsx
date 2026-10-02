@@ -17,6 +17,8 @@ import {
 import { nomeCurto } from "@/lib/dominio/cliente";
 import type { LinhaDoControle, ModeloSalvo } from "@/lib/controles/consulta";
 
+import { AnexarBoleto } from "./anexar-boleto";
+
 /**
  * O botão da coluna "Próximo passo" e a janela de enviar mensagem.
  *
@@ -42,10 +44,14 @@ export function Acoes({ linha, modelos }: { linha: LinhaDoControle; modelos: Mod
     return <span className="text-[12px] text-faint">concluída</span>;
   }
 
-  if (passo.tipo === "conferir" || passo.tipo === "anexar_boleto") {
-    // As duas telas chegam na Sprint 4. Até lá o botão leva ao cliente, que é
-    // onde a analista consegue fazer alguma coisa — botão que não faz nada é
-    // pior que botão ausente.
+  if (passo.tipo === "anexar_boleto") {
+    return <AnexarBoleto linha={linha} rotulo={passo.rotulo} />;
+  }
+
+  if (passo.tipo === "conferir") {
+    // A tela de conferir a planilha chega adiante na Sprint 4. Até lá o botão
+    // leva ao cliente, que é onde a analista consegue fazer alguma coisa —
+    // botão que não faz nada é pior que botão ausente.
     return (
       <a
         href={`/clientes/${linha.clienteId}`}

@@ -67,8 +67,6 @@ test.describe("API do portal", () => {
     { metodo: "GET", caminho: "/api/portal/arquivo/00000000-0000-0000-0000-000000000000" },
   ];
 
-  const VAZIO = "00000000-0000-0000-0000-000000000000";
-
   for (const rota of ROTAS) {
     test(`${rota.caminho} exige sessão`, async ({ request }) => {
       const resposta =
@@ -97,6 +95,30 @@ test.describe("API do portal", () => {
  * Se a guarda cair, qualquer pessoa cria login de cliente — e um login de
  * cliente alcança a relação de vidas de uma empresa.
  */
+/**
+ * Anexar boleto grava valor a cobrar do cliente e sobe arquivo com dado
+ * pessoal. As duas metades — ler o PDF e confirmar — exigem sessão.
+ */
+test.describe("anexar boleto", () => {
+  const MES = "00000000-0000-0000-0000-000000000000";
+
+  test("ler o PDF exige sessão", async ({ request }) => {
+    const resposta = await request.put(`/api/v1/controles/${MES}/boleto`, {
+      multipart: { arquivo: { name: "b.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4") } },
+    });
+    expect([401, 503]).toContain(resposta.status());
+    expect(resposta.ok()).toBe(false);
+  });
+
+  test("confirmar o boleto exige sessão", async ({ request }) => {
+    const resposta = await request.post(`/api/v1/controles/${MES}/boleto`, {
+      data: { arquivo: MES, valor: "R$ 1,00", vencimento: "2026-10-30" },
+    });
+    expect([401, 503]).toContain(resposta.status());
+    expect(resposta.ok()).toBe(false);
+  });
+});
+
 test.describe("acesso ao portal", () => {
   const CLIENTE = "00000000-0000-0000-0000-000000000000";
 
