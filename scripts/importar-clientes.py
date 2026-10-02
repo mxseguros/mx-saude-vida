@@ -450,6 +450,16 @@ def principal() -> None:
         print("\nNADA FOI GRAVADO. Rode de novo com --gravar quando o relatorio estiver certo.")
         return
 
+    # TODO objeto do lote precisa das MESMAS chaves: o PostgREST recusa com
+    # PGRST102 ("All object keys must match") quando um cadastro tem
+    # `manager_email` e o outro `manager_phone`. Preencher com None e o que faz
+    # um lote de 25 virar um INSERT so.
+    CAMPOS = [
+        "legal_name", "document", "product", "insurer_id", "inform_day", "cutoff_day",
+        "invoice_day", "due_day", "notes", "channel", "manager_name", "manager_email", "manager_phone",
+    ]
+    cadastros = [{campo: c.get(campo) for campo in CAMPOS} for c in cadastros]
+
     # Em lotes: um POST com 150 linhas que falha na ultima nao diz qual era.
     criados = 0
     for inicio in range(0, len(cadastros), 25):
