@@ -16,11 +16,14 @@ insert into insurers (name) values
   ('Bradesco'),
   ('Capemisa'),
   ('Chubb'),
+  ('Go Care'),
   ('HDI'),
   ('Icatu'),
   ('MAG'),
   ('MedSênior'),
   ('MetLife'),
+  ('Mongeral'),
+  ('Norden'),
   ('Porto'),
   ('Prudential'),
   ('Sompo'),
@@ -28,6 +31,7 @@ insert into insurers (name) values
   ('Sura'),
   ('Tokio Marine'),
   ('Uniodonto'),
+  ('Vera Cruz'),
   ('Yelum'),
   ('Zurich')
 on conflict (name) do nothing;

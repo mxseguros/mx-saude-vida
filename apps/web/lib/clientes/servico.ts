@@ -16,7 +16,14 @@ export type Falha = { status: number; codigo: string; mensagem: string; campo?: 
 
 export type ResultadoEscrita<T> = { ok: true; dados: T } | { ok: false; falha: Falha };
 
-/** O CNPJ é único: quem já está cadastrado não entra duas vezes. */
+/**
+ * Um cadastro por CNPJ E RAMO (`clients_documento_ramo_idx`).
+ *
+ * A mesma empresa pode ter VIDA e SAÚDE, cada um com suas datas — é assim no
+ * CONTROLE FATURAS. O que a constraint barra é o cadastro repetido de verdade:
+ * o mesmo CNPJ no mesmo ramo, que viraria duas linhas no Controle e duas
+ * mensagens para o mesmo gestor no mesmo dia.
+ */
 const DUPLICADO = "23505";
 
 function paraLinha(dados: DadosDoCliente) {
@@ -43,7 +50,7 @@ function interpretar(codigo: string | undefined): Falha {
     return {
       status: 409,
       codigo: "documento_duplicado",
-      mensagem: "Já existe um cliente com este CNPJ.",
+      mensagem: "Já existe um cadastro com este CNPJ neste ramo. Para outro ramo da mesma empresa, mude o tipo de seguro.",
       campo: "documento",
     };
   }
