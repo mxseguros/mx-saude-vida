@@ -110,6 +110,16 @@ jobs:
             --file=dump.pgcustom
           ls -lh dump.pgcustom
 
+      # O Postgres novo ja vem com um schema `public`, e o dump traz
+      # `CREATE SCHEMA public` — sem zerar, o restore para no primeiro comando.
+      #
+      # Zerar tambem torna a prova mais honesta: a restauracao parte de um banco
+      # VAZIO, como aconteceria num desastre de verdade.
+      - name: Zerar o banco da prova
+        run: |
+          psql "$DESTINO" -v ON_ERROR_STOP=1 -c "drop schema if exists public cascade"
+          psql "$DESTINO" -tAc "select count(*) from pg_tables where schemaname='public'"
+
       - name: Restaurar no Postgres descartavel
         run: |
           # `--single-transaction` para a prova ser tudo-ou-nada: restauracao
