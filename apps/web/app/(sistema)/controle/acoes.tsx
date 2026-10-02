@@ -54,12 +54,9 @@ export function Acoes({ linha, modelos }: { linha: LinhaDoControle; modelos: Mod
   }
 
   if (passo.tipo === "conferir") {
-    // A tela de conferir a planilha chega adiante na Sprint 4. Até lá o botão
-    // leva ao cliente, que é onde a analista consegue fazer alguma coisa —
-    // botão que não faz nada é pior que botão ausente.
     return (
       <a
-        href={`/clientes/${linha.clienteId}`}
+        href={`/controle/${linha.id}/conferir`}
         className="inline-flex min-h-[32px] items-center rounded-[6px] border border-line-strong px-2.5 text-[12px] font-[600] text-heading hover:bg-surface-2"
       >
         {passo.rotulo}

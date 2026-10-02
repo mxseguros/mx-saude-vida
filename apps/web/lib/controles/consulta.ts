@@ -216,3 +216,72 @@ export async function listarModelos(): Promise<Resultado<ModeloSalvo[]>> {
     return { dados: [], erro: "Não foi possível carregar os modelos de mensagem." };
   }
 }
+
+/**
+ * A planilha que o cliente enviou neste mês.
+ *
+ * Devolve a ficha do arquivo, não o conteúdo: quem abre o xlsx é a tela de
+ * conferir, pela rota de prévia. Separado porque `v_control_board` não leva o
+ * nome do arquivo e juntar mais uma relação ali custaria em toda listagem do
+ * Controle.
+ */
+export type PlanilhaDoMes = {
+  id: string;
+  nome: string;
+  tamanho: number | null;
+  enviadaEm: string;
+  /** Quem enviou: o gestor pelo portal, ou alguém da MX. */
+  porQuem: string | null;
+  pelaMX: boolean;
+};
+
+export async function lerPlanilhaDoMes(controleId: string): Promise<Resultado<PlanilhaDoMes | null>> {
+  try {
+    const supabase = await clienteServidor();
+
+    const { data, error } = await supabase
+      .from("client_files")
+      .select(
+        "id, original_name, size_bytes, created_at, uploaded_by_profile, uploaded_by_client_user, profiles:uploaded_by_profile(full_name), client_users:uploaded_by_client_user(full_name)",
+      )
+      .eq("control_id", controleId)
+      .eq("kind", "spreadsheet")
+      .is("deleted_at", null)
+      // A última vence: depois de uma correção o cliente reenvia, e a antiga
+      // fica no acervo mas não é a que se confere.
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) return { dados: null, erro: "Não foi possível carregar a planilha." };
+    if (!data) return { dados: null, erro: null };
+
+    const linha = data as unknown as {
+      id: string;
+      original_name: string;
+      size_bytes: number | null;
+      created_at: string;
+      uploaded_by_profile: string | null;
+      profiles: { full_name: string } | { full_name: string }[] | null;
+      client_users: { full_name: string } | { full_name: string }[] | null;
+    };
+
+    const um = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? (v[0] ?? null) : v);
+    const daEquipe = um(linha.profiles);
+    const doCliente = um(linha.client_users);
+
+    return {
+      dados: {
+        id: linha.id,
+        nome: linha.original_name,
+        tamanho: linha.size_bytes,
+        enviadaEm: linha.created_at,
+        porQuem: daEquipe?.full_name ?? doCliente?.full_name ?? null,
+        pelaMX: linha.uploaded_by_profile !== null,
+      },
+      erro: null,
+    };
+  } catch {
+    return { dados: null, erro: "Não foi possível falar com o banco de dados." };
+  }
+}

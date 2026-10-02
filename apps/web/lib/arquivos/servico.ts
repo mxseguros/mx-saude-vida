@@ -170,3 +170,48 @@ export async function urlAssinada(arquivoId: string): Promise<ResultadoEscrita<{
     return falha(503, "sem_banco", "Não foi possível falar com o servidor.");
   }
 }
+
+/**
+ * Baixa o conteúdo do arquivo para o servidor.
+ *
+ * Diferente de `urlAssinada`, que entrega o endereço para o NAVEGADOR buscar.
+ * Aqui o arquivo volta como `File` porque o servidor precisa abri-lo — é o que
+ * a prévia da planilha usa.
+ *
+ * A leitura da ficha passa pela RLS, então um id de outro cliente não é
+ * encontrado e a resposta é 404.
+ */
+export async function baixarArquivo(
+  arquivoId: string,
+): Promise<ResultadoEscrita<{ arquivo: File; nome: string }>> {
+  try {
+    const supabase = await clienteServidor();
+
+    const { data: ficha, error } = await supabase
+      .from("client_files")
+      .select("storage_path, original_name, mime, deleted_at")
+      .eq("id", arquivoId)
+      .maybeSingle();
+
+    if (error) return falha(503, "sem_banco", "Não foi possível falar com o banco de dados.");
+
+    const linha = ficha as
+      | { storage_path: string; original_name: string; mime: string; deleted_at: string | null }
+      | null;
+
+    if (!linha || linha.deleted_at) {
+      return falha(404, "nao_encontrado", "Este arquivo não está disponível.");
+    }
+
+    const { data, error: erroDownload } = await supabase.storage.from(BUCKET).download(linha.storage_path);
+
+    if (erroDownload || !data) {
+      return falha(503, "download_falhou", "Não foi possível abrir o arquivo agora. Tente de novo.");
+    }
+
+    const arquivo = new File([data], linha.original_name, { type: linha.mime });
+    return { ok: true, dados: { arquivo, nome: linha.original_name } };
+  } catch {
+    return falha(503, "sem_banco", "Não foi possível falar com o servidor.");
+  }
+}

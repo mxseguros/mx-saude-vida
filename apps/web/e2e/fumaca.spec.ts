@@ -16,6 +16,9 @@ import { expect, test } from "@playwright/test";
 
 const PROTEGIDAS = [
   "/controle",
+  // Sob `/controle` o middleware ja protege por segmento; a prova fica porque
+  // a tela mostra a relacao de vidas de uma empresa.
+  "/controle/00000000-0000-0000-0000-000000000000/conferir",
   "/clientes",
   "/clientes/novo",
   "/configuracoes",
@@ -99,6 +102,37 @@ test.describe("API do portal", () => {
  * Anexar boleto grava valor a cobrar do cliente e sobe arquivo com dado
  * pessoal. As duas metades — ler o PDF e confirmar — exigem sessão.
  */
+/**
+ * Conferir planilha abre o xlsx do cliente — nome, CPF e nascimento de cada
+ * funcionario. As tres rotas exigem sessao.
+ */
+test.describe("conferir planilha", () => {
+  const MES = "00000000-0000-0000-0000-000000000000";
+
+  test("a previa das linhas exige sessão", async ({ request }) => {
+    const resposta = await request.get(`/api/v1/controles/${MES}/previa`);
+    expect([401, 503]).toContain(resposta.status());
+    expect(resposta.ok()).toBe(false);
+  });
+
+  test("decidir a conferência exige sessão", async ({ request }) => {
+    const resposta = await request.post(`/api/v1/controles/${MES}/conferir`, { data: { acao: "conferir" } });
+    expect([401, 503]).toContain(resposta.status());
+    expect(resposta.ok()).toBe(false);
+  });
+
+  test("baixar arquivo da equipe exige sessão", async ({ request }) => {
+    const resposta = await request.get(`/api/v1/arquivos/${MES}`);
+    expect([401, 503]).toContain(resposta.status());
+    expect(resposta.ok()).toBe(false);
+  });
+
+  test("a recusa não conta nada sobre a planilha", async ({ request }) => {
+    const corpo = await (await request.get(`/api/v1/controles/${MES}/previa`)).text();
+    expect(corpo).not.toMatch(/cpf|nascimento|colaborador|vidas/i);
+  });
+});
+
 test.describe("anexar boleto", () => {
   const MES = "00000000-0000-0000-0000-000000000000";
 
