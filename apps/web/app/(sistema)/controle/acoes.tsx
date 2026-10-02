@@ -18,6 +18,7 @@ import { nomeCurto } from "@/lib/dominio/cliente";
 import type { LinhaDoControle, ModeloSalvo } from "@/lib/controles/consulta";
 
 import { AnexarBoleto } from "./anexar-boleto";
+import { MarcarPago } from "./marcar-pago";
 
 /**
  * O botão da coluna "Próximo passo" e a janela de enviar mensagem.
@@ -46,6 +47,10 @@ export function Acoes({ linha, modelos }: { linha: LinhaDoControle; modelos: Mod
 
   if (passo.tipo === "anexar_boleto") {
     return <AnexarBoleto linha={linha} rotulo={passo.rotulo} />;
+  }
+
+  if (passo.tipo === "marcar_pago") {
+    return <MarcarPago linha={linha} rotulo={passo.rotulo} />;
   }
 
   if (passo.tipo === "conferir") {
@@ -138,13 +143,21 @@ export function Acoes({ linha, modelos }: { linha: LinhaDoControle; modelos: Mod
 
   return (
     <>
-      <Botao
-        variante={linha.passo === "informar" ? "primario" : "secundario"}
-        onClick={abrir}
-        className="min-h-[32px] px-2.5 text-[12px] sm:min-h-[32px]"
-      >
-        {passo.rotulo}
-      </Botao>
+      <span className="inline-flex flex-wrap items-center gap-x-2.5 gap-y-1">
+        <Botao
+          variante={linha.passo === "informar" ? "primario" : "secundario"}
+          onClick={abrir}
+          className="min-h-[32px] px-2.5 text-[12px] sm:min-h-[32px]"
+        >
+          {passo.rotulo}
+        </Botao>
+
+        {/* Em `boleto` a mensagem é a ação principal, mas o cliente que paga no
+            dia em que recebe não deveria esperar o passo virar sozinho. */}
+        {linha.passo === "boleto" ? (
+          <MarcarPago linha={linha} rotulo="Marcar pago" variante="texto" />
+        ) : null}
+      </span>
 
       <Modal
         aberto={aberto}

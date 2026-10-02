@@ -38,6 +38,7 @@ function paraLinha(dados: DadosDoCliente) {
     cutoff_day: dados.corteDia,
     invoice_day: dados.boletoDia,
     due_day: dados.vencimentoDia,
+    mx_tracks_payment: dados.acompanhaPagamento,
     channel: deCanal(dados.canal),
     manager_name: dados.gestorNome,
     manager_phone: dados.gestorCelular,

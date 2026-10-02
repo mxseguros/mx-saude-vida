@@ -21,6 +21,20 @@ const texto = (valor: unknown) => (typeof valor === "string" ? valor.trim() : ""
 const opcional = (max: number) =>
   z.preprocess(texto, z.string().max(max, `Máximo de ${max} caracteres.`)).transform((v) => v || null);
 
+/**
+ * Caixa de selecao vinda do formulario.
+ *
+ * O estado do formulario e um mapa de STRINGS — e assim que ele sobe para a
+ * rota, sem conversao no meio. Entao o esquema aceita as duas formas: o booleano
+ * de verdade, quando quem chama e codigo, e `"1"` ou `""`, quando quem chama e a
+ * tela. Qualquer outra coisa e `false`, que e o lado que nao liga automacao.
+ */
+const booleanoDeFormulario = z.preprocess((valor) => {
+  if (typeof valor === "boolean") return valor;
+  const bruto = texto(valor).toLowerCase();
+  return bruto === "1" || bruto === "true" || bruto === "sim" || bruto === "on";
+}, z.boolean());
+
 export const PRODUTOS = ["health", "life", "dental", "global", "transport", "group_life"] as const;
 export type Produto = (typeof PRODUTOS)[number];
 
@@ -82,6 +96,14 @@ export const esquemaCliente = z
     corteDia: diaDoMes("Corte"),
     boletoDia: diaObrigatorio("Emissão do boleto"),
     vencimentoDia: diaObrigatorio("Vencimento"),
+    /**
+     * `false` = a seguradora cobra direto.
+     *
+     * O mes desse cliente FECHA ao anexar o boleto, e a mensagem de vencimento
+     * nao sai. `vencimentoDia` continua obrigatorio porque a coluna e, mas
+     * deixa de significar algo — e a tela diz isso.
+     */
+    acompanhaPagamento: booleanoDeFormulario,
 
     // Canal de aviso.
     canal: z.enum(CANAIS, { errorMap: () => ({ message: "Escolha o canal de aviso." }) }),

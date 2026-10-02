@@ -27,6 +27,9 @@ export type MesDoCliente = {
   valorDoBoleto: number | null;
   vencimentoDoBoleto: string | null;
   pagaEm: string | null;
+  parcelaDoBoleto: string | null;
+  boletoArquivoId: string | null;
+  acompanhaPagamento: boolean;
   /** Quem cuida da conta na MX, para a pessoa saber com quem fala. */
   analista: string | null;
 };
@@ -44,7 +47,10 @@ type LinhaDaView = {
   received_at: string | null;
   invoice_amount: string | number | null;
   invoice_due: string | null;
+  invoice_installment: string | null;
+  invoice_file_id: string | null;
   paid_at: string | null;
+  mx_tracks_payment: boolean;
   analyst_name: string | null;
 };
 
@@ -65,12 +71,15 @@ function paraMes(v: LinhaDaView): MesDoCliente {
     valorDoBoleto: v.invoice_amount === null ? null : Number(v.invoice_amount),
     vencimentoDoBoleto: v.invoice_due,
     pagaEm: v.paid_at,
+    parcelaDoBoleto: v.invoice_installment,
+    boletoArquivoId: v.invoice_file_id,
+    acompanhaPagamento: v.mx_tracks_payment,
     analista: v.analyst_name,
   };
 }
 
 const CAMPOS =
-  "id, competence, step, inform_date, cutoff_date, invoice_date, due_date, protocol, no_changes, received_at, invoice_amount, invoice_due, paid_at, analyst_name";
+  "id, competence, step, inform_date, cutoff_date, invoice_date, due_date, protocol, no_changes, received_at, invoice_amount, invoice_due, invoice_installment, invoice_file_id, paid_at, mx_tracks_payment, analyst_name";
 
 /**
  * O mês corrente do cliente — o que a tela chama de "pendência".

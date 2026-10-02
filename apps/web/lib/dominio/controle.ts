@@ -267,8 +267,19 @@ export function aplicarAcao(passo: Passo, acao: Acao): Passo | null {
  * depende de gente: planilha que não chegou continua em "informar", por mais
  * que o corte tenha passado — é esse atraso que a tela precisa mostrar.
  */
-export function avancoAutomatico(passo: Passo, datas: DatasDoMes, hoje: string): Passo {
+export function avancoAutomatico(
+  passo: Passo,
+  datas: DatasDoMes,
+  hoje: string,
+  acompanhaPagamento = true,
+): Passo {
   if (passo === "conferida" && datas.corte !== null && hoje >= datas.corte) return "corte";
+
+  // Seguradora que cobra direto: o mes FECHA no boleto. Esperar um vencimento
+  // que ninguem vai conferir deixaria 39 clientes parados em "boleto" para
+  // sempre, enchendo a fila da analista de linha que nao pede nada.
+  if (passo === "boleto" && !acompanhaPagamento) return "concluida";
+
   if (passo === "boleto" && diasEntre(hoje, datas.vencimento) <= DIAS_DE_AVISO) return "vencimento";
   return passo;
 }
@@ -309,8 +320,20 @@ export function mensagemDoPasso(passo: Passo): ModeloDeMensagem | null {
  * 3. **Não confere se já mandou.** Isso é do banco, por `(control_id, kind)`:
  *    a decisão "o que cabe hoje" é de calendário e fica aqui, pura; a decisão
  *    "isso já saiu" depende do que aconteceu e fica lá.
+ * 4. **Cliente que paga direto na seguradora não recebe aviso de vencimento.**
+ *    A MX não controla aquela data, e avisar sobre ela faz o cliente ligar para
+ *    perguntar de onde veio o número.
  */
-export function mensagemDevida(passo: Passo, datas: DatasDoMes, hoje: string): ModeloDeMensagem | null {
+export function mensagemDevida(
+  passo: Passo,
+  datas: DatasDoMes,
+  hoje: string,
+  acompanhaPagamento = true,
+): ModeloDeMensagem | null {
+  // Aviso de vencimento a quem paga direto na seguradora e mensagem sobre uma
+  // data que a MX nao controla — e o cliente liga para perguntar de onde veio.
+  if (!acompanhaPagamento && (passo === "vencimento" || passo === "boleto")) return null;
+
   if (passo === "informar") {
     return datas.informar !== null && hoje >= datas.informar ? "informar" : null;
   }
@@ -327,14 +350,25 @@ export type ProximoPasso =
   | { tipo: "mensagem"; modelo: ModeloDeMensagem; rotulo: string }
   | { tipo: "conferir"; rotulo: string }
   | { tipo: "anexar_boleto"; rotulo: string }
+  | { tipo: "marcar_pago"; rotulo: string }
   | { tipo: "nenhum" };
 
-/** O botão da coluna "Próximo passo". */
+/**
+ * O botão da coluna "Próximo passo".
+ *
+ * Em `vencimento` a ação é MARCAR PAGO, e não mandar mensagem: o aviso de
+ * vencimento já saiu pelo cron três dias antes, e o que a etapa espera é a
+ * confirmação de que o dinheiro entrou. Oferecer "Enviar mensagem" aqui faria a
+ * analista mandar o mesmo aviso duas vezes para cobrar o que talvez já esteja
+ * pago.
+ */
 export function proximoPasso(passo: Passo): ProximoPasso {
   if (passo === "planilha_recebida") return { tipo: "conferir", rotulo: "Conferir planilha" };
   if (passo === "conferida" || passo === "corte") {
     return { tipo: "anexar_boleto", rotulo: "Anexar boleto" };
   }
+  if (passo === "vencimento") return { tipo: "marcar_pago", rotulo: "Marcar pago" };
+
   const modelo = mensagemDoPasso(passo);
   if (modelo) return { tipo: "mensagem", modelo, rotulo: "Enviar mensagem" };
   return { tipo: "nenhum" };

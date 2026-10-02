@@ -42,7 +42,11 @@ export type LinhaDoControle = {
   conferidaEm: string | null;
   valorDoBoleto: number | null;
   vencimentoDoBoleto: string | null;
+  parcelaDoBoleto: string | null;
+  boletoArquivoId: string | null;
   pagaEm: string | null;
+  /** `false` = a seguradora cobra direto; o mes fecha no boleto. */
+  acompanhaPagamento: boolean;
 
   ultimaMensagem: { modelo: ModeloDeMensagem; canal: "email" | "whatsapp"; em: string } | null;
 };
@@ -62,7 +66,10 @@ type LinhaDaView = {
   checked_at: string | null;
   invoice_amount: string | number | null;
   invoice_due: string | null;
+  invoice_installment: string | null;
+  invoice_file_id: string | null;
   paid_at: string | null;
+  mx_tracks_payment: boolean;
   legal_name: string;
   trade_name: string | null;
   document: string;
@@ -109,7 +116,10 @@ function paraLinha(v: LinhaDaView): LinhaDoControle {
     conferidaEm: v.checked_at,
     valorDoBoleto: v.invoice_amount === null ? null : Number(v.invoice_amount),
     vencimentoDoBoleto: v.invoice_due,
+    parcelaDoBoleto: v.invoice_installment,
+    boletoArquivoId: v.invoice_file_id,
     pagaEm: v.paid_at,
+    acompanhaPagamento: v.mx_tracks_payment,
     ultimaMensagem:
       v.last_message_kind && v.last_message_at
         ? {
