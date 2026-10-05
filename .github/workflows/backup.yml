@@ -169,6 +169,19 @@ jobs:
           SQL
           echo "esqueleto do auth criado"
 
+          # Os IDS de `auth.users`, e SO os ids. `profiles.id` e `client_users.id`
+          # tem chave estrangeira para la, e sem as linhas o restore do DADO falha
+          # em "violates foreign key constraint".
+          #
+          # Copiar so o `id` e deliberado: e um uuid, nao diz nada sobre ninguem, e
+          # mantem a chave estrangeira VALENDO — entao a prova confere integridade
+          # referencial de verdade, em vez de derrubar a constraint para passar.
+          # E-mail e hash de senha ficam onde estao.
+          psql "$SUPABASE_DB_URL" -tAc "select id from auth.users" \
+            | psql "$DESTINO" -v ON_ERROR_STOP=1 -c "copy auth.users(id) from stdin"
+
+          echo "contas no esqueleto: $(psql "$DESTINO" -tAc "select count(*) from auth.users")"
+
       - name: Recriar as extensoes na prova
         run: |
           psql "$SUPABASE_DB_URL" -tAc             "select extname from pg_extension where extname <> 'plpgsql'" > extensoes.txt
