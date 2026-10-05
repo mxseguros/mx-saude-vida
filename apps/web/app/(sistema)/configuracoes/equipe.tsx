@@ -338,65 +338,81 @@ export function AbaEquipe({ equipe, euMesmo }: { equipe: PessoaEquipe[]; euMesmo
         </table>
       </div>
 
-      <form onSubmit={criarAcesso} className="flex flex-wrap items-end gap-3 border-t border-line pt-4">
-        <div className="min-w-[180px] flex-1">
-          <Campo rotulo="Nome" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome completo" />
+      {/* Os quatro campos numa grade alinhada pelo TOPO, e os botões numa linha
+          própria. Antes era uma linha só alinhada pela base: a dica do Perfil,
+          longa numa coluna estreita, quebrava em três linhas e empurrava o
+          seletor para cima dos outros campos. Rótulo e controle na mesma
+          altura em toda a grade é regra de Interface do projeto. */}
+      <form onSubmit={criarAcesso} className="flex flex-col gap-3 border-t border-line pt-4">
+        <div className="grid items-start gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_180px_1fr]">
+          <div>
+            <Campo rotulo="Nome" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome completo" />
+          </div>
+          <div>
+            <Campo
+              rotulo="E-mail"
+              type="email"
+              inputMode="email"
+              mascara={mascararEmail}
+              value={email}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setErroEmail(null);
+              }}
+              onBlur={() => setErroEmail(email.trim() && !emailValido(email) ? "E-mail inválido." : null)}
+              erro={erroEmail}
+              placeholder="nome@mxseguros.com.br"
+            />
+          </div>
+          <div>
+            <Selecao
+              rotulo="Perfil"
+              vazio={null}
+              opcoes={opcoesDePapel}
+              value={papel}
+              onChange={(e) => setPapel(e.target.value as Papel)}
+            />
+          </div>
+          <div>
+            <Campo
+              rotulo="Senha"
+              type={mostrarSenha ? "text" : "password"}
+              autoComplete="new-password"
+              value={senha}
+              onChange={(e) => {
+                setSenha(e.target.value);
+                setErroSenha(null);
+              }}
+              onBlur={() => setErroSenha(senha ? problemaDaSenha(senha) : null)}
+              erro={erroSenha}
+              placeholder="10 ou mais, com letra e número"
+            />
+          </div>
         </div>
-        <div className="min-w-[220px] flex-1">
-          <Campo
-            rotulo="E-mail"
-            type="email"
-            inputMode="email"
-            mascara={mascararEmail}
-            value={email}
-            onChange={(e) => {
-              setEmail(e.target.value);
-              setErroEmail(null);
-            }}
-            onBlur={() => setErroEmail(email.trim() && !emailValido(email) ? "E-mail inválido." : null)}
-            erro={erroEmail}
-            placeholder="nome@mxseguros.com.br"
-          />
+
+        {/* A ajuda do perfil escolhido, na largura toda: embaixo do seletor
+            ela quebrava a grade. */}
+        <p className="m-0 text-[12.5px] text-muted">
+          <b className="font-[600] text-texto">{opcoesDePapel.find((o) => o.valor === papel)?.rotulo}:</b>{" "}
+          {AJUDA_DO_PAPEL[papel]}
+        </p>
+
+        <div className="flex flex-wrap items-center gap-2.5">
+          <Botao type="button" variante="secundario" onClick={gerar}>
+            Gerar senha
+          </Botao>
+          <Botao
+            type="button"
+            variante="secundario"
+            onClick={() => setMostrarSenha((v) => !v)}
+            aria-pressed={mostrarSenha}
+          >
+            {mostrarSenha ? "Ocultar" : "Mostrar"}
+          </Botao>
+          <Botao type="submit" disabled={ocupado || !email.trim() || !nome.trim() || !senha}>
+            {ocupado ? "Criando…" : "Criar acesso"}
+          </Botao>
         </div>
-        <div className="min-w-[160px]">
-          <Selecao
-            rotulo="Perfil"
-            vazio={null}
-            opcoes={opcoesDePapel}
-            value={papel}
-            onChange={(e) => setPapel(e.target.value as Papel)}
-            dica={AJUDA_DO_PAPEL[papel]}
-          />
-        </div>
-        <div className="min-w-[220px] flex-1">
-          <Campo
-            rotulo="Senha"
-            type={mostrarSenha ? "text" : "password"}
-            autoComplete="new-password"
-            value={senha}
-            onChange={(e) => {
-              setSenha(e.target.value);
-              setErroSenha(null);
-            }}
-            onBlur={() => setErroSenha(senha ? problemaDaSenha(senha) : null)}
-            erro={erroSenha}
-            placeholder="10 ou mais, com letra e número"
-          />
-        </div>
-        <Botao type="button" variante="secundario" onClick={gerar}>
-          Gerar senha
-        </Botao>
-        <Botao
-          type="button"
-          variante="secundario"
-          onClick={() => setMostrarSenha((v) => !v)}
-          aria-pressed={mostrarSenha}
-        >
-          {mostrarSenha ? "Ocultar" : "Mostrar"}
-        </Botao>
-        <Botao type="submit" disabled={ocupado || !email.trim() || !nome.trim() || !senha}>
-          {ocupado ? "Criando…" : "Criar acesso"}
-        </Botao>
       </form>
 
       <p className="text-[12.5px] leading-relaxed text-muted">
