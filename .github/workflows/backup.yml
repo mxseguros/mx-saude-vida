@@ -140,6 +140,35 @@ jobs:
       # existem no Postgres de baunilha (pg_graphql, pgsodium, supabase_vault) e
       # que o schema `public` nao usa. Se faltar alguma que o schema USA, a
       # restauracao falha logo depois e diz qual — que e a mensagem certa.
+      # O schema `public` nao vive sozinho: `profiles.id` e `client_users.id`
+      # apontam para `auth.users`, e toda politica de RLS chama `auth.uid()`. Num
+      # Postgres de baunilha nada disso existe, e a restauracao morre em
+      # "schema auth does not exist".
+      #
+      # O esqueleto NAO e um atalho da prova: ele e justamente o que permite
+      # conferir que as POLITICAS voltaram. Sem `auth.uid()`, elas nem seriam
+      # criadas, e o passo seguinte acharia um banco aberto sem acusar nada.
+      - name: Criar o esqueleto do schema auth
+        run: |
+          psql "$DESTINO" -v ON_ERROR_STOP=1 <<'SQL'
+            create schema if not exists auth;
+
+            create table if not exists auth.users (
+              id uuid primary key,
+              email text
+            );
+
+            create or replace function auth.uid() returns uuid
+              language sql stable as $$ select null::uuid $$;
+
+            create or replace function auth.role() returns text
+              language sql stable as $$ select null::text $$;
+
+            create or replace function auth.jwt() returns jsonb
+              language sql stable as $$ select '{}'::jsonb $$;
+          SQL
+          echo "esqueleto do auth criado"
+
       - name: Recriar as extensoes na prova
         run: |
           psql "$SUPABASE_DB_URL" -tAc             "select extname from pg_extension where extname <> 'plpgsql'" > extensoes.txt
