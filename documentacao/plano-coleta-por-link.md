@@ -145,11 +145,27 @@ Nada disso **impede** conferir — aponta, como já é com o campo em branco. Qu
 
 ---
 
-## 5. O que preciso de você
+## 5. O que você respondeu, e o que ficou
 
-- [ ] **1. Aprovar a remoção do portal.** Ele está no ar e funciona; só nunca foi usado
-- [ ] **2. Quanto tempo o link vale?** O v0.7 sugere até o corte do mês. Confirmo isso como padrão?
-- [ ] **3. O gestor pode reabrir e corrigir depois de enviar?** O protótipo diz que sim ("este link continua aberto"). Isso significa que ele pode mudar a movimentação **depois** de a analista conferir — e aí o que vale?
-- [ ] **4. Os 86 clientes sem celular** — sem isso não há link a enviar
+Respondido em 05/10, e tudo já está no código:
 
-Os itens 2 e 3 eu assumo o padrão do protótipo se você não disser nada: link vale até o corte, e o reenvio volta o mês para "informar" com um aviso à analista.
+- [x] **1. Remover o portal** — removido, com migration. `client_users` e as políticas saíram
+- [x] **2. O link vale até o corte** — com piso de 3 dias, porque link mandado depois do corte nasceria morto
+- [x] **3. O gestor pode corrigir depois de enviar, com alerta ao analista** — o passo **não** volta (voltar faria o mês perder a conferência por uma correção de uma letra); o alerta é derivado na `v_control_board` e aparece em vermelho no topo da tela de coleta
+- [x] **4. O analista verifica** — os quatro apontamentos em `/controle/[id]/conferir`, e nenhum impede conferir
+- [x] **5 e 6. WhatsApp, e ele é prioridade** — é o botão principal da tela, e o passo `informar` do Controle agora leva direto a ela
+- [x] **7. Senha criada pelo admin** — nada mudou: o gestor nunca teve senha, e agora nem conta
+
+### Ainda depende de você
+
+- [ ] **Os clientes sem celular do gestor** — sem celular não há WhatsApp a mandar. O e-mail de "informar até" já sai com o mesmo link, então quem tem e-mail está coberto; quem não tem nenhum dos dois não pode ser avisado por nenhum caminho
+- [ ] **O provedor de e-mail** (Graph ou Resend) — sem isso **nenhuma mensagem sai sozinha**. O WhatsApp funciona hoje, porque é a analista que clica
+
+### O que ainda não foi provado contra produção
+
+Tudo abaixo passa em teste e compila; o que falta é uma volta completa com dado de verdade:
+
+- [ ] Gerar um link num cliente real e abrir o WhatsApp
+- [ ] O gestor preencher e enviar pelo celular
+- [ ] O upload da planilha pelo link (grava com a chave de administração — caminho novo no Storage)
+- [ ] A conferência cruzada com uma planilha real
