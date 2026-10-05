@@ -108,13 +108,13 @@ Nada disso **impede** conferir — aponta, como já é com o campo em branco. Qu
 
 ### Fase 3 — O formulário do gestor *(~2 dias)*
 
-- [ ] **3.1** Rota pública `/coleta/[token]`, fora de `ROTAS_PROTEGIDAS`
-- [ ] **3.2** As 5 etapas, com o stepper em pílulas
-- [ ] **3.3** Cartões de pessoa com validação de CPF (a regra já existe em `documento.ts`)
-- [ ] **3.4** Atalho "Ninguém entrou nem saiu"
-- [ ] **3.5** Upload opcional, reusando o XHR com progresso
-- [ ] **3.6** Tela de sucesso com protocolo e marcos; o link continua abrindo
-- [ ] **3.7** Token expirado, mês já enviado e token inválido com tela própria — **nunca** um 404 seco
+- [x] **3.1** Rota pública `/coleta/[token]`, fora de `ROTAS_PROTEGIDAS`
+- [x] **3.2** As 5 etapas, com o stepper em pílulas
+- [x] **3.3** Cartões de pessoa com validação de CPF (a regra já existe em `documento.ts`)
+- [x] **3.4** Atalho "Ninguém entrou nem saiu"
+- [x] **3.5** Upload opcional, reusando o XHR com progresso
+- [x] **3.6** Tela de sucesso com protocolo e marcos; o link continua abrindo
+- [x] **3.7** Token expirado, mês já enviado e token inválido com tela própria — **nunca** um 404 seco
 
 ### Fase 4 — A tela da analista *(~1 dia)*
 

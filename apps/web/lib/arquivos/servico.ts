@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import { clienteServidor } from "../supabase/servidor";
 import { caminhoDoArquivo, conferirArquivo, type TipoDeArquivo } from "../dominio/arquivo";
 import { ANEXO_MAXIMO, type Anexo } from "../email/tipos";
@@ -71,6 +73,15 @@ export async function enviarArquivo(
    * contato do mês (`manager_name`), que é onde o nome dele está.
    */
   autor: { perfilId: string } | null,
+  /**
+   * Quem grava. O padrão é o cliente da SESSÃO, e a RLS decide.
+   *
+   * A rota pública da coleta passa o cliente de administração: não há sessão,
+   * e as políticas do Storage para o cliente logado saíram com o portal.
+   * Receber por parâmetro, em vez de ler um "modo público" de dentro, deixa
+   * visível na chamada qual das duas coisas está acontecendo.
+   */
+  cliente?: SupabaseClient,
 ): Promise<ResultadoEscrita<ArquivoGravado>> {
   const { clienteId, controleId, competencia, tipo, arquivo } = parametros;
 
@@ -80,7 +91,7 @@ export async function enviarArquivo(
   if (problema) return falha(422, `arquivo_${problema.tipo}`, problema.mensagem);
 
   try {
-    const supabase = await clienteServidor();
+    const supabase = cliente ?? (await clienteServidor());
 
     const identificador = crypto.randomUUID();
     const caminho = caminhoDoArquivo(clienteId, pastaDe(tipo, competencia), arquivo.name, identificador);

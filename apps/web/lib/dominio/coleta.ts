@@ -14,7 +14,13 @@
  * jantar. O mesmo motivo de `hoje.ts` existir.
  */
 
+import { z } from "zod";
+
 import type { DatasDoMes } from "./controle";
+import { cpfValido, limparDocumento } from "./documento";
+import { digitosDoTelefone } from "./telefone";
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /* --------------------------------------------------------------------------
    Até quando o link vale
@@ -146,6 +152,27 @@ export function diasParaFechar(valeAte: string, hoje: string): number {
 }
 
 /* --------------------------------------------------------------------------
+   O protocolo
+   -------------------------------------------------------------------------- */
+
+/**
+ * `MX-2026-09-A1B2C3`: o número que a tela de sucesso mostra ao gestor.
+ *
+ * DERIVADO, e não uma coluna nova: ele é o mês e o id do mês escritos de outro
+ * jeito. Uma coluna `protocol` guardaria a mesma informação num segundo lugar,
+ * e a primeira vez que alguém corrigisse a competência os dois discordariam —
+ * o gestor com um papel na mão e o sistema dizendo outro número.
+ *
+ * Seis dígitos hex do uuid: a competência já separa os meses, e dentro de uma
+ * competência há 177 linhas. Não é identificador, é referência de conversa —
+ * a analista acha o mês pelo cliente, e o protocolo confirma que é o mesmo.
+ */
+export function protocoloDaColeta(controleId: string, competencia: string): string {
+  const curto = controleId.replaceAll("-", "").slice(0, 6).toUpperCase();
+  return `MX-${competencia}-${curto}`;
+}
+
+/* --------------------------------------------------------------------------
    As pessoas
    -------------------------------------------------------------------------- */
 
@@ -165,3 +192,111 @@ export const ROTULO_MOVIMENTO: Record<TipoDeMovimento, string> = {
   entrada: "Quem entrou",
   saida: "Quem saiu",
 };
+
+/* --------------------------------------------------------------------------
+   O formulário, em zod
+   -------------------------------------------------------------------------- */
+
+/**
+ * O MESMO esquema roda no navegador e na rota pública (regra 3).
+ *
+ * A rota não pode confiar em nada que chegue: ela é aberta na internet, e o
+ * token prova que a pessoa recebeu o link, não que o corpo do POST veio da
+ * nossa tela. Um esquema só, nos dois lados, é o que impede a validação do
+ * navegador e a do servidor de discordarem — e discordar aqui significa ou
+ * recusar quem está certo, ou gravar CPF inválido.
+ */
+
+const texto = (valor: unknown) => (typeof valor === "string" ? valor.trim() : "");
+
+const opcional = (max: number) =>
+  z.preprocess(texto, z.string().max(max, `Máximo de ${max} caracteres.`)).transform((v) => v || null);
+
+export const esquemaPessoa = z.object({
+  nome: z.preprocess(
+    texto,
+    z.string().min(3, "Informe o nome completo.").max(120, "Máximo de 120 caracteres."),
+  ),
+
+  /**
+   * CPF opcional, de propósito.
+   *
+   * O gestor que não tem o CPF à mão informa o nome, e a analista completa pela
+   * planilha. Exigir aqui faria ele inventar um número para o formulário deixar
+   * passar — e aí o dado entra errado parecendo certo, que é pior que faltar.
+   */
+  documento: z.preprocess(
+    (valor) => limparDocumento(texto(valor)),
+    z.string().refine((d) => d === "" || cpfValido(d), { message: "CPF inválido." }),
+  ).transform((v) => v || null),
+});
+
+export const esquemaColeta = z
+  .object({
+    // Quem está informando. O nome é dele, não da empresa: a empresa vem do
+    // cadastro e aparece travada na tela.
+    nome: z.preprocess(texto, z.string().min(3, "Informe seu nome.").max(120)),
+
+    celular: z.preprocess(
+      (valor) => digitosDoTelefone(texto(valor)),
+      z.string().refine((d) => d.length >= 10 && d.length <= 13, {
+        message: "Celular incompleto: DDD e número.",
+      }),
+    ),
+
+    /** Pode ficar em branco: campo que obriga sem precisar é beco sem saída. */
+    setor: opcional(80),
+
+    /** O atalho "Ninguém entrou nem saiu". */
+    semMovimentacao: z.boolean().default(false),
+
+    entradas: z.array(esquemaPessoa).max(500, "Muitas pessoas para um formulário: envie pela planilha."),
+    saidas: z.array(esquemaPessoa).max(500, "Muitas pessoas para um formulário: envie pela planilha."),
+
+    /** A ficha do arquivo que o upload já criou. Nulo = não mandou planilha. */
+    planilhaId: z.preprocess(
+      (valor) => texto(valor),
+      z.string().refine((v) => v === "" || UUID.test(v), { message: "Arquivo inválido." }),
+    ).transform((v) => v || null),
+
+    observacao: opcional(500),
+  })
+  /**
+   * Alguma coisa tem de chegar: ou o atalho, ou uma pessoa, ou a planilha.
+   *
+   * As três contam, e não só as duas primeiras. O gestor que tem a planilha
+   * pronta não vai redigitar quarenta nomes para o formulário aceitar, e
+   * recusá-lo seria transformar "a planilha é opcional" em "a planilha não
+   * serve". A conferência da Fase 5 cruza o que vier.
+   */
+  .refine((c) => c.semMovimentacao || c.entradas.length > 0 || c.saidas.length > 0 || c.planilhaId !== null, {
+    message: 'Informe quem entrou ou saiu, envie a planilha, ou marque "Ninguém entrou nem saiu".',
+    path: ["semMovimentacao"],
+  })
+  /**
+   * O atalho é uma AFIRMAÇÃO, e não um atalho de digitação: ele diz à MX que o
+   * mês não teve movimentação, e o mês segue direto para conferido. Marcá-lo com
+   * gente na lista é uma contradição que alguém precisa resolver antes de virar
+   * dado — e quem está na tela resolve melhor que a analista depois.
+   */
+  .refine((c) => !c.semMovimentacao || (c.entradas.length === 0 && c.saidas.length === 0), {
+    message: 'Você marcou "ninguém entrou nem saiu", mas informou pessoas. Desmarque, ou apague a lista.',
+    path: ["semMovimentacao"],
+  });
+
+export type DadosDaColeta = z.infer<typeof esquemaColeta>;
+
+/**
+ * As pessoas, prontas para o banco.
+ *
+ * Quem digitou entra aqui e não no formulário: o navegador do gestor não tem
+ * como se declarar `equipe`, e aceitar esse campo do corpo do POST deixaria
+ * qualquer um marcar a própria linha como vinda da MX — e a conferência da
+ * Fase 5 ignoraria justamente o que ela precisa cruzar.
+ */
+export function movimentosDaColeta(dados: DadosDaColeta, porQuem: QuemDigitou): Movimento[] {
+  return [
+    ...dados.entradas.map((p) => ({ tipo: "entrada" as const, nome: p.nome, documento: p.documento, porQuem })),
+    ...dados.saidas.map((p) => ({ tipo: "saida" as const, nome: p.nome, documento: p.documento, porQuem })),
+  ];
+}

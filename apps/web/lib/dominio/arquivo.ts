@@ -113,10 +113,15 @@ export function conferirArquivo(
 /**
  * O caminho do objeto no bucket: `<client_id>/<pasta>/<uuid>-<nome>`.
  *
- * A PRIMEIRA PASTA É O `client_id`, e não é organização: é a política do
- * Storage. `client_files_own_read` compara `(storage.foldername(name))[1]` com
- * `client_id_of_user()`, então é esse primeiro nível que impede um cliente de
- * alcançar o arquivo do outro. Mudar a ordem aqui abre o bucket.
+ * A primeira pasta é o `client_id`. Isso já foi a política do Storage, quando
+ * havia cliente logado: `client_files_own_read` comparava
+ * `(storage.foldername(name))[1]` com o cliente da sessão. Essas políticas
+ * saíram com o portal (05/10), e hoje só a equipe e o servidor alcançam o
+ * bucket — ninguém mais depende desta ordem para ser barrado.
+ *
+ * Ela fica porque continua valendo por dois motivos: a varredura de retenção e
+ * a auditoria perguntam "o que é deste cliente?", e é esta pasta que responde;
+ * e se um dia voltar a existir acesso por cliente, a separação já está feita.
  */
 export function caminhoDoArquivo(
   clienteId: string,

@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import { datasDaCompetencia } from "../lib/dominio/controle";
+import { porCampo, validar } from "../lib/dominio/validar";
 import {
   BYTES_DO_TOKEN,
   DIAS_MINIMOS,
   diasParaFechar,
   estadoDoLink,
   pareceToken,
+  esquemaColeta,
+  movimentosDaColeta,
+  protocoloDaColeta,
   tokenDeColeta,
   valeAte,
 } from "../lib/dominio/coleta";
@@ -179,5 +183,156 @@ describe("o token", () => {
     expect(pareceToken("a".repeat(65))).toBe(false);
     expect(pareceToken(`${"a".repeat(42)}/..`)).toBe(false);
     expect(pareceToken(`${"a".repeat(42)} `)).toBe(false);
+  });
+});
+
+describe("o formulário do gestor", () => {
+  const base = {
+    nome: "Gestor Exemplo",
+    celular: "(55) 55555-5555",
+    setor: "",
+    semMovimentacao: false,
+    entradas: [{ nome: "Pessoa Que Entrou", documento: "999.999.990-50" }],
+    saidas: [],
+    planilhaId: "",
+    observacao: "",
+  };
+
+  function analisar(troca: Record<string, unknown> = {}) {
+    return validar(esquemaColeta, { ...base, ...troca });
+  }
+
+  it("um envio completo passa", () => {
+    const r = analisar();
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.dados.celular).toBe("55555555555");
+      expect(r.dados.entradas[0]?.documento).toBe("99999999050");
+      expect(r.dados.setor).toBeNull();
+      expect(r.dados.planilhaId).toBeNull();
+    }
+  });
+
+  /**
+   * O CPF é opcional de propósito. O gestor que não o tem à mão informa o nome
+   * e a analista completa pela planilha; exigir aqui faria ele inventar um
+   * número para o formulário deixar passar — e dado errado parecendo certo é
+   * pior que dado faltando.
+   */
+  it("pessoa sem CPF passa", () => {
+    const r = analisar({ entradas: [{ nome: "Pessoa Sem Documento", documento: "" }] });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.dados.entradas[0]?.documento).toBeNull();
+  });
+
+  it("CPF inválido é recusado, e aponta a pessoa", () => {
+    const r = analisar({ entradas: [{ nome: "Pessoa Com CPF Errado", documento: "11111111111" }] });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(porCampo(r.erros)["entradas.0.documento"]).toBe("CPF inválido.");
+  });
+
+  it("nome curto é recusado", () => {
+    const r = analisar({ entradas: [{ nome: "Jo", documento: "" }] });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(porCampo(r.erros)["entradas.0.nome"]).toMatch(/nome completo/i);
+  });
+
+  it("o atalho sozinho passa", () => {
+    const r = analisar({ semMovimentacao: true, entradas: [] });
+    expect(r.ok).toBe(true);
+  });
+
+  /**
+   * O atalho é uma AFIRMAÇÃO — ele manda o mês direto para conferido. Marcá-lo
+   * com gente na lista é contradição, e quem está na tela resolve melhor que a
+   * analista depois.
+   */
+  it("o atalho com gente na lista é recusado", () => {
+    const r = analisar({ semMovimentacao: true });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(porCampo(r.erros).semMovimentacao).toMatch(/Desmarque/);
+  });
+
+  /**
+   * Só a planilha BASTA. O gestor que tem o arquivo pronto não vai redigitar
+   * quarenta nomes, e recusá-lo transformaria "a planilha é opcional" em "a
+   * planilha não serve".
+   */
+  it("só a planilha basta", () => {
+    const r = analisar({ entradas: [], planilhaId: "f0000000-0000-0000-0000-00000000000a" });
+    expect(r.ok).toBe(true);
+  });
+
+  it("formulário vazio é recusado, e aponta o atalho", () => {
+    const r = analisar({ entradas: [] });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(porCampo(r.erros).semMovimentacao).toMatch(/Ninguém entrou nem saiu/);
+  });
+
+  it("celular incompleto é recusado", () => {
+    const r = analisar({ celular: "5555" });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(porCampo(r.erros).celular).toMatch(/DDD/);
+  });
+
+  /**
+   * Todos de uma vez (regra 3): um formulário que corrige um erro por vez faz
+   * o gestor enviar cinco vezes, e na quinta ele desiste e manda por e-mail.
+   */
+  it("devolve todos os erros de uma vez", () => {
+    const r = analisar({ nome: "", celular: "", entradas: [{ nome: "Jo", documento: "11111111111" }] });
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      const campos = Object.keys(porCampo(r.erros));
+      expect(campos).toContain("nome");
+      expect(campos).toContain("celular");
+      expect(campos).toContain("entradas.0.nome");
+      expect(campos).toContain("entradas.0.documento");
+    }
+  });
+
+  /**
+   * `porQuem` NÃO vem do corpo do POST. O navegador do gestor não tem como se
+   * declarar `equipe`, e aceitar esse campo deixaria qualquer um marcar a
+   * própria linha como vinda da MX — e a Fase 5 ignoraria justamente o que ela
+   * precisa cruzar com a planilha.
+   */
+  it("quem digitou é decidido pela rota, não pelo envio", () => {
+    const r = analisar({ saidas: [{ nome: "Pessoa Que Saiu", documento: "" }], porQuem: "equipe" });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const movimentos = movimentosDaColeta(r.dados, "gestor");
+    expect(movimentos).toHaveLength(2);
+    expect(movimentos.every((m) => m.porQuem === "gestor")).toBe(true);
+    expect(movimentos.map((m) => m.tipo)).toEqual(["entrada", "saida"]);
+  });
+
+  it("arquivo que não é uuid é recusado", () => {
+    const r = analisar({ planilhaId: "../../etc/passwd" });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(porCampo(r.erros).planilhaId).toBe("Arquivo inválido.");
+  });
+});
+
+describe("o protocolo", () => {
+  it("junta a competência e o mês num número que dá para ditar no telefone", () => {
+    expect(protocoloDaColeta("c0000000-0000-0000-0000-00000000000a", "2026-09")).toBe("MX-2026-09-C00000");
+  });
+
+  /**
+   * Derivado, e não coluna. Uma coluna `protocol` guardaria a mesma informação
+   * num segundo lugar, e a primeira correção de competência faria o gestor ter
+   * um número na mão e o sistema dizer outro.
+   */
+  it("o mesmo mês dá sempre o mesmo protocolo", () => {
+    const id = "ab12cd34-0000-0000-0000-000000000000";
+    expect(protocoloDaColeta(id, "2026-11")).toBe(protocoloDaColeta(id, "2026-11"));
+    expect(protocoloDaColeta(id, "2026-11")).toBe("MX-2026-11-AB12CD");
+  });
+
+  it("meses diferentes do mesmo cliente não colidem", () => {
+    const a = protocoloDaColeta("c0000000-0000-0000-0000-00000000000a", "2026-09");
+    const b = protocoloDaColeta("d0000000-0000-0000-0000-00000000000b", "2026-10");
+    expect(a).not.toBe(b);
   });
 });

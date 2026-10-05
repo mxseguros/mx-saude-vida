@@ -107,6 +107,76 @@ test.describe("anexar boleto", () => {
 });
 
 /**
+ * A coleta por link é PÚBLICA, e isso é uma propriedade a provar.
+ *
+ * Se alguém puser `/coleta` em `ROTAS_PROTEGIDAS`, nada dá erro: a página passa
+ * a mandar o gestor para uma tela de login que ele nunca vai conseguir usar —
+ * ele não tem conta. O mês inteiro deixa de ser informado, e a MX descobre pelo
+ * telefone, dias depois.
+ *
+ * Esta suíte roda SEM banco, então o token não resolve e a página cai na tela
+ * de "link inválido". É o suficiente: o que se mede aqui é que ela RENDERIZA em
+ * vez de redirecionar.
+ */
+test.describe("coleta por link", () => {
+  const TOKEN = "abcdefghijklmnopqrstuvwxyz0123456789ABCDE";
+
+  test("a página abre sem sessão", async ({ page }) => {
+    await page.goto(`/coleta/${TOKEN}`);
+
+    await expect(page).not.toHaveURL(/\/entrar/);
+    // A âncora é o marco de página, não o texto: a tela varia entre inválido e
+    // formulário conforme o banco responde, e as duas são a página certa.
+    await expect(page.locator("main")).toBeVisible();
+  });
+
+  test("um só marco de página — dois confundem o leitor de tela", async ({ page }) => {
+    await page.goto(`/coleta/${TOKEN}`);
+    await expect(page.locator("main")).toHaveCount(1);
+  });
+
+  /**
+   * Token inventado não pode contar nada. Quem varre endereços aprenderia pela
+   * diferença entre as respostas quais tokens existem.
+   */
+  test("a recusa não conta nada sobre a empresa", async ({ page }) => {
+    await page.goto(`/coleta/${TOKEN}`);
+    const corpo = (await page.locator("body").textContent()) ?? "";
+    expect(corpo).not.toMatch(/cnpj|razão social|competência|analista/i);
+  });
+
+  test("o envio exige um token que valha", async ({ request }) => {
+    const resposta = await request.post(`/api/coleta/${TOKEN}`, {
+      data: { nome: "Quem Tentou", celular: "55555555555", semMovimentacao: true, entradas: [], saidas: [] },
+    });
+
+    // 404 quando há banco e o token não existe; 503 nesta suíte, que roda sem
+    // banco. As duas recusam, e nenhuma grava.
+    expect([404, 503]).toContain(resposta.status());
+    expect(resposta.ok()).toBe(false);
+  });
+
+  test("a planilha também exige o token", async ({ request }) => {
+    const resposta = await request.post(`/api/coleta/${TOKEN}/planilha`, {
+      multipart: {
+        arquivo: { name: "p.xlsx", mimeType: "application/vnd.ms-excel", buffer: Buffer.from("x") },
+      },
+    });
+    expect([404, 503]).toContain(resposta.status());
+    expect(resposta.ok()).toBe(false);
+  });
+
+  /**
+   * Token com formato impossível é recusado ANTES do banco (`pareceToken`). A
+   * rota é aberta na internet: `/coleta/` com 4 KB na URL não merece consulta.
+   */
+  test("token absurdo é recusado sem ir ao banco", async ({ request }) => {
+    const resposta = await request.post(`/api/coleta/${"a".repeat(2000)}`, { data: {} });
+    expect(resposta.status()).toBe(404);
+  });
+});
+
+/**
  * O cron é uma porta aberta na internet com um segredo por fechadura, e roda
  * com a chave que ignora a RLS. Se a fechadura parar de fechar, nada acusa:
  * o job continua funcionando, só que para qualquer um que saiba a URL.

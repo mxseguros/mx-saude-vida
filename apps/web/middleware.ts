@@ -11,6 +11,15 @@ import { renovarSessao } from "@/lib/supabase/middleware";
  * redirect, sempre, e ha um try/catch de ultimo recurso no fim.
  */
 
+/**
+ * As rotas da EQUIPE. Rota nova entra aqui e em `e2e/fumaca.spec.ts`, no mesmo
+ * commit.
+ *
+ * `/coleta/<token>` NAO entra, e e deliberado: ela e do gestor do cliente, que
+ * nao tem conta — o link e o acesso dele. Quem autoriza ali e o token, conferido
+ * no servidor. Por em ROTAS_PROTEGIDAS mandaria o gestor a um login que ele
+ * nunca conseguiria usar, e o mes deixaria de ser informado sem ninguem notar.
+ */
 const ROTAS_PROTEGIDAS = ["/controle", "/clientes", "/configuracoes"];
 
 /** Para onde vai quem entrou sem destino declarado. */
