@@ -28,8 +28,10 @@ values
   ('22222222-2222-2222-2222-222222222222', 'admin@exemplo.test',    'authenticated', 'authenticated', now(), now()),
   ('33333333-3333-3333-3333-333333333333', 'desligada@exemplo.test','authenticated', 'authenticated', now(), now()),
   ('44444444-4444-4444-4444-444444444444', 'leitura@exemplo.test',  'authenticated', 'authenticated', now(), now()),
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'gestor.a@exemplo.test', 'authenticated', 'authenticated', now(), now()),
-  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'gestor.b@exemplo.test', 'authenticated', 'authenticated', now(), now());
+  -- Conta no Auth SEM linha em profiles. E o que sobra de um acesso antigo de
+  -- portal, e o que acontece quando a criacao de uma pessoa da equipe falha
+  -- no meio. A secao 6 prova que ela nao alcanca nada.
+  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'sem-perfil@exemplo.test', 'authenticated', 'authenticated', now(), now());
 
 insert into profiles (id, full_name, role, active)
 values
@@ -61,6 +63,29 @@ values
 
 insert into control_events (control_id, type, origin, actor_profile_id, to_step, note)
 values ('c0000000-0000-0000-0000-00000000000a', 'opened', 'system', null, 'inform', 'Aberto no teste.');
+
+-- A coleta: o mes A tem link gerado, o mes B nao. Os dois enums novos
+-- (movement_kind, movement_source) e os dois valores novos de
+-- control_event_type nascem exercitados aqui — regra do CLAUDE.md.
+update monthly_controls
+   set collection_token      = 'token-de-teste-do-mes-a',
+       collection_expires_at = timestamptz '2026-09-10 23:59:59-03',
+       manager_name          = 'Gestor A',
+       manager_phone         = '55555555555',
+       manager_sector        = 'Producao'
+ where id = 'c0000000-0000-0000-0000-00000000000a';
+
+insert into movements (control_id, kind, full_name, document, source)
+values
+  ('c0000000-0000-0000-0000-00000000000a', 'entry', 'Pessoa Que Entrou', '99999999901', 'manager'),
+  ('c0000000-0000-0000-0000-00000000000a', 'exit',  'Pessoa Que Saiu',   null,          'manager'),
+  ('c0000000-0000-0000-0000-00000000000b', 'entry', 'Pessoa Do Mes B',   '99999999902', 'staff');
+
+insert into control_events (control_id, type, origin, actor_profile_id, note)
+values
+  ('c0000000-0000-0000-0000-00000000000a', 'link_sent', 'staff',
+   '11111111-1111-1111-1111-111111111111', 'Link enviado no teste.'),
+  ('c0000000-0000-0000-0000-00000000000a', 'link_opened', 'client', null, 'Link aberto no teste.');
 
 insert into messages (control_id, kind, channel, to_address, body, status)
 values
@@ -113,6 +138,7 @@ set local role anon;
 select pg_temp.exigir((select count(*) from clients) = 0, 'anonimo enxergou clientes');
 select pg_temp.exigir((select count(*) from profiles) = 0, 'anonimo enxergou a equipe');
 select pg_temp.exigir((select count(*) from monthly_controls) = 0, 'anonimo enxergou o controle');
+select pg_temp.exigir((select count(*) from movements) = 0, 'anonimo enxergou quem entrou e quem saiu');
 select pg_temp.exigir((select count(*) from client_files) = 0, 'anonimo enxergou arquivos');
 select pg_temp.exigir((select count(*) from messages) = 0, 'anonimo enxergou mensagens');
 select pg_temp.exigir((select count(*) from message_templates) = 0, 'anonimo enxergou os modelos de mensagem');
@@ -143,6 +169,23 @@ select pg_temp.exigir(
   (select count(*) from v_control_board where id in ('c0000000-0000-0000-0000-00000000000a', 'c0000000-0000-0000-0000-00000000000b')) = 2,
   'analista ativa nao enxergou os dois controles na view'
 );
+
+select pg_temp.exigir((select count(*) from movements) = 3, 'analista ativa nao enxergou a movimentacao');
+
+-- A analista digita a movimentacao quando o gestor manda por fora. `staff` aqui
+-- e o que a conferencia da Fase 5 NAO cruza com a planilha do gestor.
+insert into movements (control_id, kind, full_name, document, source)
+values ('c0000000-0000-0000-0000-00000000000a', 'entry', 'Digitado Pela Analista', '99999999903', 'staff');
+
+-- Reenvio do gestor refaz o que ELE informou: as linhas de `manager` saem e as
+-- novas entram. O que o gestor mandou antes fica na linha do tempo, que e
+-- append-only — e por isso que apagar aqui nao perde a historia.
+with removido as (
+  delete from movements
+   where control_id = 'c0000000-0000-0000-0000-00000000000a' and source = 'manager'
+  returning 1
+)
+select pg_temp.exigir((select count(*) from removido) = 2, 'analista nao refez a movimentacao do gestor');
 
 update clients set notes = 'editado pela analista' where id = 'a0000000-0000-0000-0000-000000000001';
 select pg_temp.exigir(
@@ -225,6 +268,20 @@ select pg_temp.exigir_recusa(
   'perfil de leitura registrou mensagem'
 );
 
+select pg_temp.exigir_recusa(
+  $$insert into movements (control_id, kind, full_name, source)
+    values ('c0000000-0000-0000-0000-00000000000a', 'entry', 'Pessoa Da Leitura', 'staff')$$,
+  'perfil de leitura digitou movimentacao'
+);
+
+-- Gerar link e ESCRITA: o token e a credencial de quem vai informar as vidas da
+-- empresa, e quem so le nao distribui credencial.
+with alterado as (
+  update monthly_controls set collection_token = 'token-da-leitura'
+   where id = 'c0000000-0000-0000-0000-00000000000b' returning 1
+)
+select pg_temp.exigir((select count(*) from alterado) = 0, 'perfil de leitura gerou link de coleta');
+
 -- ===========================================================================
 -- 6. Conta autenticada SEM perfil nao ve nada
 --
@@ -245,6 +302,7 @@ set local request.jwt.claims to '{"sub":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","
 select pg_temp.exigir((select count(*) from clients) = 0, 'conta sem perfil enxergou clientes');
 select pg_temp.exigir((select count(*) from monthly_controls) = 0, 'conta sem perfil enxergou o controle');
 select pg_temp.exigir((select count(*) from client_files) = 0, 'conta sem perfil enxergou arquivos');
+select pg_temp.exigir((select count(*) from movements) = 0, 'conta sem perfil enxergou a movimentacao');
 select pg_temp.exigir((select count(*) from messages) = 0, 'conta sem perfil enxergou mensagens');
 select pg_temp.exigir((select count(*) from control_events) = 0, 'conta sem perfil enxergou a linha do tempo');
 select pg_temp.exigir((select count(*) from v_control_board) = 0, 'conta sem perfil enxergou a view do controle');
@@ -266,6 +324,23 @@ select pg_temp.exigir_recusa(
     values ('c0000000-0000-0000-0000-00000000000a', 'spreadsheet_received', 'client',
             'inform', 'spreadsheet_received')$$,
   'conta sem perfil gravou evento na linha do tempo'
+);
+
+-- Nem a movimentacao. O formulario publico nao fala com o banco: ele chama uma
+-- rota de servidor que confere o token e escreve com a chave de administracao.
+-- O token prova que a pessoa RECEBEU o link, nao QUEM ela e, e isso nao da para
+-- perguntar em SQL.
+select pg_temp.exigir_recusa(
+  $$insert into movements (control_id, kind, full_name, source)
+    values ('c0000000-0000-0000-0000-00000000000a', 'entry', 'Pela Porta Dos Fundos', 'manager')$$,
+  'conta sem perfil digitou movimentacao'
+);
+
+-- E nao descobre o token de ninguem: quem le a coluna le o link de todos os
+-- clientes de uma vez.
+select pg_temp.exigir(
+  (select count(*) from monthly_controls where collection_token is not null) = 0,
+  'conta sem perfil leu o token de coleta'
 );
 
 -- ===========================================================================
@@ -312,7 +387,52 @@ select pg_temp.exigir_recusa(
   'usuario comum executou funcao que e so do servidor'
 );
 
+-- As duas funcoes de retencao sao `security definer` e apagam dado pessoal.
+-- Regra 7: `revoke` de anon e authenticated. Quem chama e o cron, com a chave
+-- de servico — nao a interface.
+select pg_temp.exigir_recusa(
+  $$select limpar_movimentacao_vencida()$$,
+  'usuario comum apagou a movimentacao de todo mundo'
+);
+
+select pg_temp.exigir_recusa(
+  $$select marcar_arquivo_removido('f0000000-0000-0000-0000-00000000000a')$$,
+  'usuario comum marcou arquivo como removido'
+);
+
+-- ===========================================================================
+-- 9. Token de coleta nunca existe sem prazo, e nunca se repete
+--
+-- Link sem validade e link eterno, e um link eterno na mao de um
+-- ex-funcionario e um vazamento que ninguem fecha. O check mora no banco
+-- porque a rota nao e o unico caminho: script de carga e correcao manual
+-- tambem passam por aqui.
+-- ===========================================================================
 reset role;
+
+select pg_temp.exigir_recusa(
+  $$update monthly_controls set collection_token = 'token-sem-prazo', collection_expires_at = null
+     where id = 'c0000000-0000-0000-0000-00000000000b'$$,
+  'token entrou sem prazo de validade',
+  '23514'
+);
+
+-- Tirar o link e tirar os dois campos, e isso tem que passar.
+update monthly_controls
+   set collection_token = null, collection_expires_at = null
+ where id = 'c0000000-0000-0000-0000-00000000000a';
+
+-- Dois meses nao dividem token: quem adivinhasse um entraria em dois.
+update monthly_controls
+   set collection_token = 'token-disputado', collection_expires_at = now()
+ where id = 'c0000000-0000-0000-0000-00000000000a';
+
+select pg_temp.exigir_recusa(
+  $$update monthly_controls set collection_token = 'token-disputado', collection_expires_at = now()
+     where id = 'c0000000-0000-0000-0000-00000000000b'$$,
+  'dois meses ficaram com o mesmo token',
+  '23505'
+);
 
 rollback;
 

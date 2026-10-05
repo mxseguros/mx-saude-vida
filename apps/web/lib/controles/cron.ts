@@ -41,6 +41,8 @@ export type ResumoDoDia = {
   emailsFalhos: number;
   whatsappsPendentes: number;
   semContato: number;
+  /** Linhas de movimentacao apagadas por retencao: nome e CPF de quem entrou e saiu. */
+  movimentacaoRemovida: number;
   /** Arquivos com retencao vencida, apagados nesta rodada (LGPD art. 16). */
   removidos: number;
 };
@@ -88,6 +90,7 @@ export async function rodarODia(hoje: string, supabase: Cliente): Promise<Resumo
     emailsFalhos: 0,
     whatsappsPendentes: 0,
     semContato: 0,
+    movimentacaoRemovida: 0,
     removidos: 0,
   };
 
@@ -181,6 +184,7 @@ export async function rodarODia(hoje: string, supabase: Cliente): Promise<Resumo
   // cliente ja foi avisado. Avisar e do dia; apagar arquivo vencido espera.
   const retencao = await aplicarRetencao(supabase);
   resumo.removidos = retencao.removidos;
+  resumo.movimentacaoRemovida = retencao.movimentacao;
 
   return resumo;
 }

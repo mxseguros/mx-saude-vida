@@ -8,6 +8,7 @@
 import type { Passo } from "./controle";
 import type { Canal } from "./mensagem";
 import type { ModeloDeMensagem } from "./controle";
+import type { Movimento, QuemDigitou, TipoDeMovimento } from "./coleta";
 import type { Papel, Pessoa } from "./tipos";
 
 /* --------------------------------------------------------------------------
@@ -127,4 +128,42 @@ export function paraModelo(valor: string): ModeloDeMensagem {
 
 export function deModelo(modelo: ModeloDeMensagem): string {
   return MODELO_PARA_O_BANCO[modelo];
+}
+
+/* --------------------------------------------------------------------------
+   Movimentação: `entry`/`exit` e `manager`/`staff` no banco
+   -------------------------------------------------------------------------- */
+
+export type LinhaMovimento = {
+  id: number;
+  kind: string;
+  full_name: string;
+  document: string | null;
+  source: string;
+};
+
+/**
+ * Tipo desconhecido vira `entrada`, e quem digitou vira `equipe`.
+ *
+ * O padrão é o lado SEGURO de cada um. Um `kind` novo no banco apareceria como
+ * entrada — a tela mostra a pessoa, e a analista vê que algo está errado. Virar
+ * `gestor` por engano seria pior: a conferência da Fase 5 cruza com a planilha
+ * só o que o GESTOR informou, e uma linha da equipe entrando nesse cruzamento
+ * geraria apontamento que ninguém pode resolver.
+ */
+export function paraMovimento(linha: LinhaMovimento): Movimento {
+  return {
+    tipo: linha.kind === "exit" ? "saida" : "entrada",
+    nome: linha.full_name,
+    documento: linha.document,
+    porQuem: linha.source === "manager" ? "gestor" : "equipe",
+  };
+}
+
+export function deTipoDeMovimento(tipo: TipoDeMovimento): "entry" | "exit" {
+  return tipo === "saida" ? "exit" : "entry";
+}
+
+export function deQuemDigitou(quem: QuemDigitou): "manager" | "staff" {
+  return quem === "gestor" ? "manager" : "staff";
 }

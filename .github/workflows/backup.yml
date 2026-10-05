@@ -140,8 +140,8 @@ jobs:
       # existem no Postgres de baunilha (pg_graphql, pgsodium, supabase_vault) e
       # que o schema `public` nao usa. Se faltar alguma que o schema USA, a
       # restauracao falha logo depois e diz qual — que e a mensagem certa.
-      # O schema `public` nao vive sozinho: `profiles.id` e `client_users.id`
-      # apontam para `auth.users`, e toda politica de RLS chama `auth.uid()`. Num
+      # O schema `public` nao vive sozinho: `profiles.id` aponta para
+      # `auth.users`, e toda politica de RLS chama `auth.uid()`. Num
       # Postgres de baunilha nada disso existe, e a restauracao morre em
       # "schema auth does not exist".
       #
@@ -183,9 +183,9 @@ jobs:
           SQL
           echo "esqueleto do auth criado"
 
-          # Os IDS de `auth.users`, e SO os ids. `profiles.id` e `client_users.id`
-          # tem chave estrangeira para la, e sem as linhas o restore do DADO falha
-          # em "violates foreign key constraint".
+          # Os IDS de `auth.users`, e SO os ids. `profiles.id` tem chave
+          # estrangeira para la, e sem as linhas o restore do DADO falha em
+          # "violates foreign key constraint".
           #
           # Copiar so o `id` e deliberado: e um uuid, nao diz nada sobre ninguem, e
           # mantem a chave estrangeira VALENDO — entao a prova confere integridade
@@ -239,7 +239,7 @@ jobs:
       # ele nao passa e por esta conferencia.
       - name: Conferir as contagens
         run: |
-          TABELAS="clients insurers monthly_controls control_events messages message_templates client_files client_users profiles policies retention_rules"
+          TABELAS="clients insurers monthly_controls control_events messages message_templates client_files movements profiles policies retention_rules"
           FALHOU=0
 
           for T in $TABELAS; do

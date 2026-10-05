@@ -7,7 +7,8 @@ import { registrarLog } from "../log";
  * Retenção de dado pessoal (LGPD art. 16), executada pelo cron.
  *
  * A planilha de vidas tem nome, CPF e nascimento de cada funcionário do
- * cliente. Dado que não precisa mais existir é dado que pode vazar.
+ * cliente, e `movements` guarda a transcrição disso — nome e CPF de quem entrou
+ * e de quem saiu. Dado que não precisa mais existir é dado que pode vazar.
  *
  * A ORDEM É O PONTO DESTE MÓDULO: apaga o OBJETO no Storage primeiro, e só
  * depois marca a ficha. Invertido, uma falha no Storage deixaria a ficha
@@ -26,6 +27,8 @@ export type ResumoDaRetencao = {
   falhas: number;
   /** Quantos estavam vencidos quando o job olhou. */
   vencidos: number;
+  /** Linhas de movimentação apagadas: nome e CPF de quem entrou e saiu. */
+  movimentacao: number;
 };
 
 /** Teto por execução. Mil arquivos de uma vez estourariam o tempo da função. */
@@ -36,7 +39,12 @@ const BUCKET = "client-files";
 export async function aplicarRetencao(
   supabase: ReturnType<typeof clienteAdministrador>,
 ): Promise<ResumoDaRetencao> {
-  const resumo: ResumoDaRetencao = { removidos: 0, falhas: 0, vencidos: 0 };
+  const resumo: ResumoDaRetencao = { removidos: 0, falhas: 0, vencidos: 0, movimentacao: 0 };
+
+  // ANTES dos arquivos, e fora do `try` deles: a movimentação não depende do
+  // Storage, e uma falha de bucket não pode ser motivo para o CPF digitado
+  // continuar no banco mais um mês.
+  resumo.movimentacao = await limparMovimentacao(supabase);
 
   try {
     const { data, error } = await supabase
@@ -86,5 +94,30 @@ export async function aplicarRetencao(
   } catch {
     registrarLog("erro", "retencao.falhou", {});
     return resumo;
+  }
+}
+
+/**
+ * A movimentação vencida, pelo prazo da planilha.
+ *
+ * A conta e o prazo moram no banco (`limpar_movimentacao_vencida`), que lê
+ * `retention_rules`: prazo de retenção é decisão de negócio, e muda com
+ * orientação jurídica sem deploy. O que mora aqui é só quando chamar.
+ */
+async function limparMovimentacao(supabase: ReturnType<typeof clienteAdministrador>): Promise<number> {
+  try {
+    const { data, error } = await supabase.rpc("limpar_movimentacao_vencida");
+
+    if (error) {
+      registrarLog("erro", "retencao.movimentacao", { codigo: error.code });
+      return 0;
+    }
+
+    const apagadas = typeof data === "number" ? data : 0;
+    if (apagadas > 0) registrarLog("info", "retencao.movimentacao", { apagadas });
+    return apagadas;
+  } catch {
+    registrarLog("erro", "retencao.movimentacao_falhou", {});
+    return 0;
   }
 }

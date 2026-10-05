@@ -102,9 +102,9 @@ Nada disso **impede** conferir — aponta, como já é com o campo em branco. Qu
 
 ### Fase 2 — O banco da coleta *(~0,5 dia)*
 
-- [ ] **2.1** Migration: os campos em `monthly_controls` e a tabela `movements`
-- [ ] **2.2** RLS: equipe lê e escreve; **nenhuma política para `anon`**
-- [ ] **2.3** Geração do token — aleatório, 32 bytes, com validade
+- [x] **2.1** Migration: os campos em `monthly_controls` e a tabela `movements`
+- [x] **2.2** RLS: equipe lê e escreve; **nenhuma política para `anon`**
+- [x] **2.3** Geração do token — aleatório, 32 bytes, com validade
 
 ### Fase 3 — O formulário do gestor *(~2 dias)*
 
