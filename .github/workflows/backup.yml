@@ -148,6 +148,20 @@ jobs:
       # O esqueleto NAO e um atalho da prova: ele e justamente o que permite
       # conferir que as POLITICAS voltaram. Sem `auth.uid()`, elas nem seriam
       # criadas, e o passo seguinte acharia um banco aberto sem acusar nada.
+      # Os PAPEIS do Supabase. Toda politica de RLS e `TO authenticated`, e o
+      # nome do papel entra no DDL mesmo com `--no-privileges` — entao sem eles
+      # o restore morre em "role authenticated does not exist".
+      #
+      # Sao papeis VAZIOS, sem login e sem permissao: o Postgres da prova vive
+      # dentro do runner e morre com ele. O que importa e que as politicas
+      # possam ser CRIADAS, para o passo de conferencia poder conta-las.
+      - name: Criar os papeis do Supabase na prova
+        run: |
+          for PAPEL in anon authenticated service_role authenticator supabase_admin supabase_auth_admin supabase_storage_admin dashboard_user pgbouncer; do
+            psql "$DESTINO" -q -c "do \$\$ begin if not exists (select 1 from pg_roles where rolname='$PAPEL') then create role \"$PAPEL\" nologin noinherit; end if; end \$\$" 2>/dev/null \
+              && echo "  ok      $PAPEL" || echo "  falhou  $PAPEL"
+          done
+
       - name: Criar o esqueleto do schema auth
         run: |
           psql "$DESTINO" -v ON_ERROR_STOP=1 <<'SQL'
