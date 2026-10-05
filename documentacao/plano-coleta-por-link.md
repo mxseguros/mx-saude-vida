@@ -126,9 +126,9 @@ Nada disso **impede** conferir — aponta, como já é com o campo em branco. Qu
 
 ### Fase 5 — A verificação *(~1 dia)*
 
-- [ ] **5.1** `/controle/[id]/conferir` mostra as entradas e saídas digitadas
-- [ ] **5.2** O cruzamento digitado × planilha, com os quatro apontamentos
-- [ ] **5.3** Função pura e testada, com "hoje" por parâmetro, como o resto do domínio
+- [x] **5.1** `/controle/[id]/conferir` mostra as entradas e saídas digitadas
+- [x] **5.2** O cruzamento digitado × planilha, com os quatro apontamentos
+- [x] **5.3** Função pura e testada, com "hoje" por parâmetro, como o resto do domínio
 
 **Total: ~5 dias.**
 

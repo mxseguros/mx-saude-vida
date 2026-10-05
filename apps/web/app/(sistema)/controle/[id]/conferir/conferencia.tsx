@@ -10,6 +10,9 @@ import { Aviso, useAviso } from "@/componentes/ui/aviso";
 import { emMegabytes } from "@/lib/dominio/arquivo";
 import { formatarMoeda, mascararDocumento } from "@/lib/dominio/mascaras";
 import { nomeDoMes, type Passo } from "@/lib/dominio/controle";
+import { ROTULO_APONTAMENTO, type Conferencia } from "@/lib/dominio/conferencia";
+import { formatarDocumento } from "@/lib/dominio/documento";
+import type { Movimento } from "@/lib/dominio/coleta";
 import { ROTULO_COLUNA, type ColunaDaPlanilha, type LinhaDaPlanilha } from "@/lib/dominio/planilha";
 import type { PlanilhaDoMes } from "@/lib/controles/consulta";
 
@@ -39,6 +42,10 @@ type Previa = {
   linhas: LinhaDaPlanilha[];
   cortada?: boolean;
   motivo?: string;
+  /** Quem o gestor informou, e quem a MX digitou. */
+  movimentacao?: Movimento[];
+  /** `null` quando não há planilha a cruzar. */
+  conferencia?: Conferencia | null;
 };
 
 /** As colunas da prévia, na ordem do modelo de importação. */
@@ -198,10 +205,19 @@ export function Conferencia({
           {erroPrevia}
         </p>
       ) : previa && !previa.planilha ? (
-        <div className="rounded-[10px] border border-warn bg-warn-soft p-4 text-[13.5px] leading-relaxed text-texto">
-          <b className="block font-[600]">Nenhuma planilha neste mês.</b>O cliente ainda não enviou, ou o arquivo
-          foi removido. Cobre pelo Controle, ou anexe a planilha que ele mandou por fora.
-        </div>
+        <>
+          {/* Sem planilha, o que o gestor digitou é a única coisa a conferir —
+              e é o caso comum do cliente que informa duas entradas pelo link e
+              não tem arquivo nenhum. */}
+          <Informado movimentacao={previa.movimentacao ?? []} />
+
+          <div className="rounded-[10px] border border-warn bg-warn-soft p-4 text-[13.5px] leading-relaxed text-texto">
+            <b className="block font-[600]">Nenhuma planilha neste mês.</b>
+            {previa.movimentacao?.length
+              ? "O gestor informou pela lista acima, sem anexar arquivo — o que é permitido. Confira com ele se faltou alguém."
+              : "O cliente ainda não enviou, e também não informou ninguém. Cobre pelo Controle, ou anexe a planilha que ele mandou por fora."}
+          </div>
+        </>
       ) : previa?.motivo ? (
         <div className="rounded-[10px] border border-warn bg-warn-soft p-4 text-[13.5px] leading-relaxed text-texto">
           <b className="block font-[600]">Não consegui abrir este arquivo.</b>
@@ -209,6 +225,9 @@ export function Conferencia({
         </div>
       ) : previa ? (
         <>
+          <Apontamentos conferencia={previa.conferencia ?? null} />
+          <Informado movimentacao={previa.movimentacao ?? []} />
+
           <div className="flex flex-wrap gap-2.5">
             <Tile valor={previa.total} rotulo={previa.total === 1 ? "vida na planilha" : "vidas na planilha"} />
             <Tile
@@ -464,4 +483,118 @@ function quando(iso: string): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+/* --------------------------------------------------------------------------
+   O cruzamento
+   -------------------------------------------------------------------------- */
+
+/**
+ * Os apontamentos do cruzamento entre o informado e a planilha.
+ *
+ * NENHUM deles impede conferir, e a tela diz isso em voz alta. Alerta que
+ * bloqueia ensina a analista a procurar como desligá-lo; alerta que informa ela
+ * lê. A decisão continua sendo dela — e nos quatro casos há um motivo legítimo
+ * para seguir assim mesmo.
+ *
+ * Fonte vermelha e nunca fundo vermelho: a regra do projeto vale aqui também, e
+ * um bloco vermelho no topo da tela diria "pare" quando o recado é "olhe".
+ */
+function Apontamentos({ conferencia }: { conferencia: Conferencia | null }) {
+  if (!conferencia) return null;
+
+  const { apontamentos, conferem, semDocumento } = conferencia;
+
+  if (apontamentos.length === 0) {
+    return (
+      <p className="rounded-[10px] border border-ok bg-ok-soft px-3.5 py-3 text-[13.5px] text-texto">
+        <b className="font-[600]">O informado fecha com a planilha.</b>{" "}
+        {conferem === 1 ? "1 pessoa confere" : `${conferem} pessoas conferem`}
+        {semDocumento ? `, e ${semDocumento} foram informadas sem CPF.` : "."}
+      </p>
+    );
+  }
+
+  return (
+    <section className="flex flex-col gap-2.5 rounded-[10px] border border-line bg-surface p-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h2 className="m-0 font-(family-name:--font-display) text-[15px] font-[600] text-heading">
+          {apontamentos.length === 1 ? "1 ponto a conferir" : `${apontamentos.length} pontos a conferir`}
+        </h2>
+        <span className="text-[12.5px] text-muted">
+          {conferem === 1 ? "1 pessoa confere" : `${conferem} pessoas conferem`}
+          {semDocumento ? ` · ${semDocumento} informada(s) sem CPF` : ""}
+        </span>
+      </div>
+
+      <p className="m-0 text-[12.5px] leading-[1.5] text-muted">
+        Nada aqui impede conferir. São avisos — quem decide é você.
+      </p>
+
+      <ul className="m-0 flex list-none flex-col gap-2.5 p-0">
+        {apontamentos.map((a, i) => (
+          <li key={`${a.tipo}-${a.documento}-${i}`} className="flex flex-col gap-0.5 border-t border-line pt-2.5">
+            <span className="text-[12px] font-[600] uppercase tracking-[0.04em] text-bad">
+              {ROTULO_APONTAMENTO[a.tipo]}
+            </span>
+            <span className="text-[13.5px] font-[500] text-heading">
+              {a.nome || "sem nome"}
+              {a.documento ? <span className="ml-2 font-normal text-muted">{a.documento}</span> : null}
+              {a.linha ? <span className="ml-2 font-normal text-faint">linha {a.linha}</span> : null}
+            </span>
+            <span className="text-[12.5px] leading-[1.45] text-texto">{a.mensagem}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/**
+ * Quem o gestor informou, e quem a MX digitou.
+ *
+ * Separados por quem digitou, e não numa lista só: é a pergunta que aparece
+ * quando a fatura não fecha — "isso veio do cliente ou nós anotamos?". Juntar
+ * as duas apagaria a resposta.
+ *
+ * Em cartões e não em tabela: a regra do projeto é que tabela não rola de lado,
+ * e nome mais CPF mais origem não caberiam na largura do celular.
+ */
+function Informado({ movimentacao }: { movimentacao: Movimento[] }) {
+  if (movimentacao.length === 0) return null;
+
+  const grupos = [
+    { tipo: "entrada" as const, rotulo: "Quem entrou" },
+    { tipo: "saida" as const, rotulo: "Quem saiu" },
+  ];
+
+  return (
+    <section className="grid gap-3 sm:grid-cols-2">
+      {grupos.map(({ tipo, rotulo }) => {
+        const pessoas = movimentacao.filter((m) => m.tipo === tipo);
+        return (
+          <div key={tipo} className="flex flex-col gap-2 rounded-[10px] border border-line bg-surface p-3.5">
+            <h3 className="m-0 text-[12px] font-[600] uppercase tracking-[0.05em] text-muted">
+              {rotulo} · {pessoas.length}
+            </h3>
+            {pessoas.length === 0 ? (
+              <p className="m-0 text-[13px] text-faint">Ninguém</p>
+            ) : (
+              <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
+                {pessoas.map((p, i) => (
+                  <li key={i} className="flex flex-wrap items-baseline gap-x-2 text-[13px]">
+                    <span className="font-[500] text-heading">{p.nome}</span>
+                    <span className="text-muted">{p.documento ? formatarDocumento(p.documento) : "sem CPF"}</span>
+                    {p.porQuem === "equipe" ? (
+                      <span className="text-[11.5px] text-faint">digitado pela MX</span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        );
+      })}
+    </section>
+  );
 }
