@@ -124,9 +124,6 @@ jobs:
           # foi assim que a primeira versao deste job pulou todas as extensoes e
           # morreu depois em "type public.citext does not exist".
           #
-          # O dump traz `CREATE SCHEMA public`, entao ele e criado aqui e
-          # derrubado de novo pelo proprio restore? Nao: `pg_dump --schema=public`
-          # emite `CREATE SCHEMA` so quando o schema nao e o padrao. Como ele e,
           # o restore assume que existe — que e exatamente o que queremos.
           psql "$DESTINO" -v ON_ERROR_STOP=1 -c "create schema public"
           echo "tabelas em public: $(psql "$DESTINO" -tAc "select count(*) from pg_tables where schemaname='public'")"
@@ -160,12 +157,24 @@ jobs:
 
       - name: Restaurar no Postgres descartavel
         run: |
+          # O dump TRAZ `CREATE SCHEMA public`, e o schema precisa existir antes
+          # para as extensoes entrarem. Os dois nao cabem juntos: o restore morre
+          # em "schema public already exists".
+          #
+          # A saida e filtrar essa entrada do INDICE do dump. Cirurgico: nada mais
+          # e descartado e o `--single-transaction` continua valendo. Tolerar o erro
+          # seria mais curto e deixaria uma falha de verdade passar junto.
+          pg_restore --list dump.pgcustom > indice.txt
+          grep -v "SCHEMA - public" indice.txt > indice-sem-schema.txt
+          echo "indice: $(wc -l < indice.txt) entradas, $(wc -l < indice-sem-schema.txt) depois do filtro"
+
           # `--single-transaction` para a prova ser tudo-ou-nada: restauracao
           # parcial que "quase deu" e o pior resultado possivel aqui.
           pg_restore \
             --dbname="$DESTINO" \
             --no-owner --no-privileges \
             --single-transaction \
+            --use-list=indice-sem-schema.txt \
             dump.pgcustom
           echo "restaurado"
 
