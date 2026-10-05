@@ -2,6 +2,8 @@ import "server-only";
 
 import { randomBytes } from "node:crypto";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import { BYTES_DO_TOKEN, tokenDeColeta, valeAte } from "../dominio/coleta";
 import { hojeSaoPaulo } from "../dominio/hoje";
 import type { Falha, ResultadoEscrita } from "../clientes/servico";
@@ -140,5 +142,115 @@ export async function gerarLinkDeColeta(
     return { ok: true, dados: { token, valeAte: fecha } };
   } catch {
     return { ok: false, falha: falhaGenerica() };
+  }
+}
+
+/**
+ * O token do mês, numa consulta de uma linha.
+ *
+ * Não vem da `v_control_board` de propósito: aquela view desenha 177 linhas no
+ * Controle, e pôr o token em cada uma faria a credencial de acesso às vidas de
+ * todos os clientes viajar até o navegador a cada abertura da tela. Quem precisa
+ * dele é esta tela, para um mês.
+ *
+ * Lê com o cliente da SESSÃO: a RLS confere que quem pede é da equipe. É o
+ * contrário da rota pública, onde não há sessão e o token é a autoridade.
+ */
+export async function lerTokenDoMes(controleId: string): Promise<string | null> {
+  try {
+    const supabase = await clienteServidor();
+    const { data, error } = await supabase
+      .from("monthly_controls")
+      .select("collection_token")
+      .eq("id", controleId)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return (data as { collection_token: string | null }).collection_token;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * O link do mês, gerando um se ainda não houver.
+ *
+ * Serve às MENSAGENS: o cron manda o aviso de "informar até" às 7h, sem sessão
+ * nenhuma, e o texto precisa carregar um endereço que abra. Gerar na hora do
+ * envio é o que evita a mensagem sair com `{{link}}` vazio — um aviso que pede
+ * movimentação sem dizer por onde é pior que nenhum aviso.
+ *
+ * NÃO refaz o que já existe. Refazer mataria o link que o gestor já tem aberto:
+ * o aviso de corte sai depois do de informar, e o segundo envio invalidaria o
+ * primeiro no meio do preenchimento.
+ *
+ * Devolve `null` quando não dá para gerar. Quem chama põe `{{link}}` vazio e a
+ * mensagem sai sem ele — melhor um texto incompleto que um texto com um
+ * endereço quebrado.
+ */
+export async function garantirLinkDeColeta(
+  controleId: string,
+  gestor: Gestor,
+  cliente: SupabaseClient,
+  hoje: string = hojeSaoPaulo(),
+): Promise<string | null> {
+  try {
+    const { data, error } = await cliente
+      .from("monthly_controls")
+      .select("collection_token, collection_expires_at, inform_date, cutoff_date, invoice_date, due_date")
+      .eq("id", controleId)
+      .maybeSingle();
+
+    if (error || !data) return null;
+
+    const linha = data as {
+      collection_token: string | null;
+      collection_expires_at: string | null;
+      inform_date: string | null;
+      cutoff_date: string | null;
+      invoice_date: string;
+      due_date: string;
+    };
+
+    if (linha.collection_token) return linha.collection_token;
+
+    const fecha = valeAte(
+      {
+        informar: linha.inform_date,
+        corte: linha.cutoff_date,
+        boleto: linha.invoice_date,
+        vencimento: linha.due_date,
+      },
+      hoje,
+    );
+
+    const token = tokenDeColeta(randomBytes(BYTES_DO_TOKEN));
+
+    const { error: erroUpdate } = await cliente
+      .from("monthly_controls")
+      .update({
+        collection_token: token,
+        collection_expires_at: `${fecha}T23:59:59-03:00`,
+        manager_name: gestor.nome,
+        manager_phone: gestor.celular,
+        manager_sector: gestor.setor,
+      })
+      .eq("id", controleId);
+
+    if (erroUpdate) return null;
+
+    // Origem `system`: ninguém clicou. A linha do tempo precisa dizer isso —
+    // "a MX mandou o link" e "o job das 7h mandou o link" levam a conversas
+    // diferentes quando o gestor liga dizendo que não recebeu nada.
+    await cliente.from("control_events").insert({
+      control_id: controleId,
+      type: "link_sent",
+      origin: "system",
+      note: `Link gerado junto com o aviso automático. Vale até ${fecha}.`,
+    });
+
+    return token;
+  } catch {
+    return null;
   }
 }

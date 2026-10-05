@@ -49,6 +49,48 @@ export type LinhaDoControle = {
   acompanhaPagamento: boolean;
 
   ultimaMensagem: { modelo: ModeloDeMensagem; canal: "email" | "whatsapp"; em: string } | null;
+
+  /** A coleta por link deste mês. */
+  coleta: Coleta;
+};
+
+export type Coleta = {
+  /**
+   * Se existe link gerado. O TOKEN não vem aqui, de propósito.
+   *
+   * A analista pode lê-lo — a RLS da tabela permite —, mas esta consulta
+   * desenha 177 linhas no Controle, e pôr em cada linha a credencial de acesso
+   * às vidas de uma empresa faria o token de todos os clientes viajar até o
+   * navegador a cada abertura da tela. Quem precisa do token é a tela da
+   * coleta, e ela busca o do seu mês.
+   */
+  temLink: boolean;
+  /** O dia, inclusive, até o qual o link abre. */
+  valeAte: string | null;
+  /** Quando o gestor abriu o link pela primeira vez. */
+  abertoEm: string | null;
+
+  /**
+   * Quem informou NESTE mês, que pode não ser o contato do cadastro: quem
+   * informa muda de um mês para o outro. As duas respostas interessam — a do
+   * cadastro para saber a quem mandar, esta para saber quem respondeu.
+   */
+  gestorDoMes: { nome: string | null; celular: string | null; setor: string | null };
+
+  /** Separados porque a conferência trata diferente. */
+  entradasDoGestor: number;
+  saidasDoGestor: number;
+  entradasDaEquipe: number;
+  saidasDaEquipe: number;
+
+  /**
+   * O gestor reenviou DEPOIS de a analista conferir.
+   *
+   * É o alerta da decisão de 05/10: ele pode corrigir, e a MX tem de saber —
+   * senão a fatura vai com o número que ela conferiu e a movimentação que
+   * entrou é outra.
+   */
+  reenviouDepoisDeConferir: boolean;
 };
 
 type LinhaDaView = {
@@ -84,6 +126,17 @@ type LinhaDaView = {
   last_message_kind: string | null;
   last_message_channel: string | null;
   last_message_at: string | null;
+  has_collection_link: boolean | null;
+  collection_expires_at: string | null;
+  collection_opened_at: string | null;
+  month_manager_name: string | null;
+  month_manager_phone: string | null;
+  month_manager_sector: string | null;
+  manager_entries: number | null;
+  manager_exits: number | null;
+  staff_entries: number | null;
+  staff_exits: number | null;
+  resent_after_check: boolean | null;
 };
 
 function paraLinha(v: LinhaDaView): LinhaDoControle {
@@ -128,6 +181,23 @@ function paraLinha(v: LinhaDaView): LinhaDoControle {
             em: v.last_message_at,
           }
         : null,
+    coleta: {
+      temLink: v.has_collection_link === true,
+      // O banco guarda o instante; a decisão de prazo é por DIA, e é assim que
+      // o domínio compara (`estadoDoLink`).
+      valeAte: v.collection_expires_at ? v.collection_expires_at.slice(0, 10) : null,
+      abertoEm: v.collection_opened_at,
+      gestorDoMes: {
+        nome: v.month_manager_name,
+        celular: v.month_manager_phone,
+        setor: v.month_manager_sector,
+      },
+      entradasDoGestor: Number(v.manager_entries ?? 0),
+      saidasDoGestor: Number(v.manager_exits ?? 0),
+      entradasDaEquipe: Number(v.staff_entries ?? 0),
+      saidasDaEquipe: Number(v.staff_exits ?? 0),
+      reenviouDepoisDeConferir: v.resent_after_check === true,
+    },
   };
 }
 

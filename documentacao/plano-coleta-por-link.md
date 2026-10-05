@@ -118,10 +118,11 @@ Nada disso **impede** conferir — aponta, como já é com o campo em branco. Qu
 
 ### Fase 4 — A tela da analista *(~1 dia)*
 
-- [ ] **4.1** `/controle/[id]/coleta` com o bloco do WhatsApp e o divisor
-- [ ] **4.2** O mesmo formulário de 5 etapas para a analista
-- [ ] **4.3** Botão na linha do Controle: "Enviar link" quando o passo é `informar`
-- [ ] **4.4** A coluna "Última mensagem" passa a mostrar quando o link foi aberto
+- [x] **4.1** `/controle/[id]/coleta` com o bloco do WhatsApp e o divisor
+- [x] **4.2** O mesmo formulário de 5 etapas para a analista
+  - ⚠️ **Entregue numa página só, não em 5 passos.** Mesmas seções, mesma ordem, mesmo esquema zod — mas sem paginação: o gestor preenche no celular, onde uma pergunta por vez é o que cabe; a analista está no computador com o cliente ditando nomes ao telefone, e cinco cliques entre "Maria" e "João" são cinco chances de perder o fio.
+- [x] **4.3** Botão na linha do Controle: "Enviar link" quando o passo é `informar`
+- [x] **4.4** A coluna "Última mensagem" passa a mostrar quando o link foi aberto
 
 ### Fase 5 — A verificação *(~1 dia)*
 

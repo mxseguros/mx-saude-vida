@@ -1,7 +1,7 @@
 import "server-only";
 
 import { aplicarAcao, type Passo } from "../dominio/controle";
-import { movimentosDaColeta, protocoloDaColeta, type DadosDaColeta } from "../dominio/coleta";
+import { movimentosDaColeta, type DadosDaColeta, type QuemDigitou } from "../dominio/coleta";
 import { deQuemDigitou, deTipoDeMovimento, dePasso, paraPasso } from "../dominio/mapear";
 import { hojeSaoPaulo } from "../dominio/hoje";
 import { registrarLog } from "../log";
@@ -26,6 +26,7 @@ import { mesDoToken } from "./consulta";
 export type Recusa = { status: number; codigo: string; mensagem: string };
 
 export type ColetaRegistrada = {
+  /** `MOV-000123`: o numero que o banco gerou quando o mes abriu. */
   protocolo: string;
   /** `true` quando ele já havia enviado: a tela fala diferente, e a MX é avisada. */
   correcao: boolean;
@@ -72,40 +73,109 @@ export async function registrarColeta(
     return { ok: false, falha: mes.estado === "expirado" ? RECUSA_EXPIRADO : RECUSA_INVALIDO };
   }
 
+  return gravarColeta(mes.controleId, dados, { tipo: "gestor" });
+}
+
+/**
+ * A MESMA coleta, digitada pela analista.
+ *
+ * Existe porque acontece: o gestor manda a movimentação por e-mail, por áudio
+ * no WhatsApp, ou dita por telefone. Sem este caminho a analista teria de
+ * abrir o link do cliente e se passar por ele — e aí a MX perderia a única
+ * coisa que a Fase 5 precisa saber para conferir: **quem** disse o quê.
+ *
+ * Por isso `staff`. A conferência cruza com a planilha o que o GESTOR informou;
+ * o que a analista digitou ela já sabe de onde veio.
+ */
+export async function registrarColetaPelaEquipe(
+  controleId: string,
+  dados: DadosDaColeta,
+  perfilId: string,
+): Promise<{ ok: true; dados: ColetaRegistrada } | { ok: false; falha: Recusa }> {
+  try {
+    const supabase = clienteAdministrador();
+    const { data, error } = await supabase
+      .from("monthly_controls")
+      .select("id")
+      .eq("id", controleId)
+      .maybeSingle();
+
+    if (error) return { ok: false, falha: RECUSA_BANCO };
+    if (!data) {
+      return {
+        ok: false,
+        falha: { status: 404, codigo: "nao_encontrado", mensagem: "Esta movimentação não existe." },
+      };
+    }
+
+    return gravarColeta(controleId, dados, { tipo: "equipe", perfilId });
+  } catch {
+    return { ok: false, falha: RECUSA_BANCO };
+  }
+}
+
+/** Quem digitou, e o que isso muda na gravação. */
+type Quem = { tipo: "gestor" } | { tipo: "equipe"; perfilId: string };
+
+/**
+ * A gravação, uma só para os dois caminhos.
+ *
+ * Grava com a chave de administração nos DOIS casos. No caminho do gestor
+ * porque não há sessão. No da analista porque a mesma função serve aos dois, e
+ * `exigirEscrita` já barrou o perfil de leitura na rota — a RLS faria a mesma
+ * pergunta, e fazer duas funções só para trocar o cliente do Supabase seria
+ * duplicar a regra para não duplicar uma linha.
+ */
+async function gravarColeta(
+  controleId: string,
+  dados: DadosDaColeta,
+  quem: Quem,
+): Promise<{ ok: true; dados: ColetaRegistrada } | { ok: false; falha: Recusa }> {
+  const porQuem = quem.tipo === "gestor" ? "gestor" : "equipe";
+  const fonte = deQuemDigitou(porQuem);
+
   try {
     const supabase = clienteAdministrador();
 
     const { data: atual, error: erroPasso } = await supabase
       .from("monthly_controls")
-      .select("step, checked_at")
-      .eq("id", mes.controleId)
+      .select("step, checked_at, received_at, protocol")
+      .eq("id", controleId)
       .single();
 
     if (erroPasso || !atual) return { ok: false, falha: RECUSA_BANCO };
 
-    const linha = atual as { step: string; checked_at: string | null };
+    const linha = atual as {
+      step: string;
+      checked_at: string | null;
+      received_at: string | null;
+      protocol: string | null;
+    };
     const passoAtual = paraPasso(linha.step);
 
     // Quantas linhas havia, para o evento contar o que mudou.
     const { count: antes } = await supabase
       .from("movements")
       .select("id", { count: "exact", head: true })
-      .eq("control_id", mes.controleId)
-      .eq("source", "manager");
+      .eq("control_id", controleId)
+      .eq("source", fonte);
 
+    // Refaz SÓ as linhas de quem está gravando agora. Um reenvio do gestor não
+    // apaga o que a analista digitou à mão: ela digitou porque sabia algo que o
+    // formulário não trouxe.
     const { error: erroApagar } = await supabase
       .from("movements")
       .delete()
-      .eq("control_id", mes.controleId)
-      .eq("source", "manager");
+      .eq("control_id", controleId)
+      .eq("source", fonte);
 
     if (erroApagar) return { ok: false, falha: RECUSA_BANCO };
 
-    const movimentos = movimentosDaColeta(dados, "gestor");
+    const movimentos = movimentosDaColeta(dados, porQuem);
     if (movimentos.length) {
       const { error: erroInserir } = await supabase.from("movements").insert(
         movimentos.map((m) => ({
-          control_id: mes.controleId,
+          control_id: controleId,
           kind: deTipoDeMovimento(m.tipo),
           full_name: m.nome,
           document: m.documento,
@@ -121,9 +191,14 @@ export async function registrarColeta(
 
     const mudanca: Record<string, unknown> = {
       received_at: agora,
-      // Nulo de propósito: quem mandou não é da equipe. Quem foi se lê em
-      // `manager_name`, que é onde o nome dele está.
-      received_by_profile: null,
+      /**
+       * Quem da MX recebeu. Nulo quando veio pelo link: o gestor não tem conta,
+       * e quem informou se lê em `manager_name`.
+       *
+       * Quando a analista digita, ela assina — é o que diferencia depois "o
+       * gestor informou" de "alguém da MX anotou o que ouviu no telefone".
+       */
+      received_by_profile: quem.tipo === "equipe" ? quem.perfilId : null,
       no_changes: dados.semMovimentacao,
       received_note: dados.observacao ?? (dados.semMovimentacao ? "Ninguém entrou nem saiu no mês." : null),
       spreadsheet_file_id: dados.planilhaId,
@@ -141,43 +216,52 @@ export async function registrarColeta(
      * uma letra no nome, e o Controle pediria o trabalho de novo. O passo fica,
      * o dado novo entra, e o alerta é o que chama a analista para olhar.
      */
-    const correcao = mes.jaEnviou;
+    const correcao = linha.received_at !== null;
     if (destino && !correcao) mudanca.step = dePasso(destino);
     if (dados.semMovimentacao && destino === "conferida" && !correcao) {
       // "Ninguém entrou nem saiu" não tem planilha a conferir: o próprio
       // atalho é a conferência, e é o que a máquina já diz ao levar a
       // `conferida`. O carimbo registra que não houve gente da MX nisso.
       mudanca.checked_at = agora;
-      mudanca.checked_by = null;
-      mudanca.check_note = "Conferência automática: o gestor informou que não houve movimentação.";
+      mudanca.checked_by = quem.tipo === "equipe" ? quem.perfilId : null;
+      mudanca.check_note =
+        quem.tipo === "equipe"
+          ? "Sem movimentação no mês, conforme o gestor informou."
+          : "Conferência automática: o gestor informou que não houve movimentação.";
     }
 
     const { error: erroUpdate } = await supabase
       .from("monthly_controls")
       .update(mudanca)
-      .eq("id", mes.controleId);
+      .eq("id", controleId);
 
     if (erroUpdate) return { ok: false, falha: RECUSA_BANCO };
 
-    const nota = notaDoEvento(dados, movimentos.length, antes ?? 0, correcao, linha.checked_at);
+    const nota = notaDoEvento(dados, antes ?? 0, correcao, linha.checked_at, porQuem);
 
     const { error: erroEvento } = await supabase.from("control_events").insert({
-      control_id: mes.controleId,
+      control_id: controleId,
       type: dados.semMovimentacao ? "no_changes" : "spreadsheet_received",
-      // `client`: houve gente, e não foi da MX. O selo na linha do tempo diz
-      // isso, e é o que separa "o gestor informou" de "a analista digitou".
-      origin: "client",
-      actor_profile_id: null,
+      /**
+       * `client` quando veio pelo link, `staff` quando a analista digitou.
+       *
+       * É o selo da linha do tempo, e é o que separa "o gestor informou" de "a
+       * MX anotou". A pergunta aparece de verdade seis meses depois, quando
+       * alguém quer saber de onde saiu um CPF.
+       */
+      origin: quem.tipo === "gestor" ? "client" : "staff",
+      actor_profile_id: quem.tipo === "equipe" ? quem.perfilId : null,
       from_step: dePasso(passoAtual),
       to_step: dePasso((destino && !correcao ? destino : passoAtual) as Passo),
       note: nota,
       payload: { entradas: dados.entradas.length, saidas: dados.saidas.length, correcao },
     });
 
-    // Aqui NÃO desfaço. Em todo o resto do sistema, mudança sem registro volta
-    // atrás; neste caminho, desfazer significaria descartar o que o gestor
-    // acabou de digitar no celular — e ele não tem conta, não tem rascunho e
-    // talvez não volte. O dado fica, e a falha vira log para a MX conferir.
+    // Aqui NÃO desfaço, e é a única exceção no sistema. Em todo o resto,
+    // mudança sem registro volta atrás; neste caminho, desfazer significaria
+    // descartar o que acabou de ser digitado no celular — e o gestor não tem
+    // conta, não tem rascunho e talvez não volte. O dado fica, e a falha vira
+    // log para a MX conferir.
     if (erroEvento) registrarLog("erro", "coleta.evento", { codigo: erroEvento.code });
 
     registrarLog("info", "coleta.recebida", {
@@ -190,7 +274,7 @@ export async function registrarColeta(
 
     return {
       ok: true,
-      dados: { protocolo: protocoloDaColeta(mes.controleId, mes.competencia), correcao },
+      dados: { protocolo: linha.protocol ?? "", correcao },
     };
   } catch {
     return { ok: false, falha: RECUSA_BANCO };
@@ -206,26 +290,33 @@ export async function registrarColeta(
  */
 function notaDoEvento(
   dados: DadosDaColeta,
-  quantas: number,
   antes: number,
   correcao: boolean,
   conferidoEm: string | null,
+  porQuem: QuemDigitou,
 ): string {
+  // "O gestor" quando ele mesmo preencheu o link; "A MX" quando a analista
+  // digitou o que ele mandou por fora. A frase é o que a analista lê meses
+  // depois, e as duas situações pedem conferências diferentes.
+  const autor = porQuem === "gestor" ? "O gestor" : "A MX";
+
   if (dados.semMovimentacao) {
     return correcao
-      ? "O gestor reenviou e agora informa que NÃO houve movimentação no mês."
-      : "O gestor informou que ninguém entrou nem saiu no mês.";
+      ? `${autor} corrigiu: agora consta que NÃO houve movimentação no mês.`
+      : porQuem === "gestor"
+        ? "O gestor informou que ninguém entrou nem saiu no mês."
+        : "A MX registrou que não houve movimentação, conforme o gestor informou.";
   }
 
   const partes = [`${dados.entradas.length} entrada(s)`, `${dados.saidas.length} saída(s)`];
   if (dados.planilhaId) partes.push("planilha anexada");
 
-  if (!correcao) return `O gestor informou ${partes.join(", ")}.`;
+  if (!correcao) return `${autor} informou ${partes.join(", ")}.`;
 
   const aviso = conferidoEm
     ? "ATENÇÃO: o mês já havia sido conferido. Confira de novo o que mudou."
     : "O envio anterior foi substituído.";
-  return `O gestor REENVIOU: ${partes.join(", ")} (antes eram ${antes} pessoa(s)). ${aviso}`;
+  return `${autor} REENVIOU: ${partes.join(", ")} (antes eram ${antes} pessoa(s)). ${aviso}`;
 }
 
 /**

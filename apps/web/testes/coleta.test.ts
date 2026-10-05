@@ -10,7 +10,6 @@ import {
   pareceToken,
   esquemaColeta,
   movimentosDaColeta,
-  protocoloDaColeta,
   tokenDeColeta,
   valeAte,
 } from "../lib/dominio/coleta";
@@ -311,28 +310,5 @@ describe("o formulário do gestor", () => {
     const r = analisar({ planilhaId: "../../etc/passwd" });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(porCampo(r.erros).planilhaId).toBe("Arquivo inválido.");
-  });
-});
-
-describe("o protocolo", () => {
-  it("junta a competência e o mês num número que dá para ditar no telefone", () => {
-    expect(protocoloDaColeta("c0000000-0000-0000-0000-00000000000a", "2026-09")).toBe("MX-2026-09-C00000");
-  });
-
-  /**
-   * Derivado, e não coluna. Uma coluna `protocol` guardaria a mesma informação
-   * num segundo lugar, e a primeira correção de competência faria o gestor ter
-   * um número na mão e o sistema dizer outro.
-   */
-  it("o mesmo mês dá sempre o mesmo protocolo", () => {
-    const id = "ab12cd34-0000-0000-0000-000000000000";
-    expect(protocoloDaColeta(id, "2026-11")).toBe(protocoloDaColeta(id, "2026-11"));
-    expect(protocoloDaColeta(id, "2026-11")).toBe("MX-2026-11-AB12CD");
-  });
-
-  it("meses diferentes do mesmo cliente não colidem", () => {
-    const a = protocoloDaColeta("c0000000-0000-0000-0000-00000000000a", "2026-09");
-    const b = protocoloDaColeta("d0000000-0000-0000-0000-00000000000b", "2026-10");
-    expect(a).not.toBe(b);
   });
 });

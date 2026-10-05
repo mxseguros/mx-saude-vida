@@ -348,6 +348,7 @@ export function mensagemDevida(
 
 export type ProximoPasso =
   | { tipo: "mensagem"; modelo: ModeloDeMensagem; rotulo: string }
+  | { tipo: "coleta"; rotulo: string }
   | { tipo: "conferir"; rotulo: string }
   | { tipo: "anexar_boleto"; rotulo: string }
   | { tipo: "marcar_pago"; rotulo: string }
@@ -361,8 +362,15 @@ export type ProximoPasso =
  * confirmação de que o dinheiro entrou. Oferecer "Enviar mensagem" aqui faria a
  * analista mandar o mesmo aviso duas vezes para cobrar o que talvez já esteja
  * pago.
+ *
+ * Em `informar` a ação é MANDAR O LINK, e não a mensagem genérica. Decisão do
+ * Gabriel (05/10): o envio pelo WhatsApp é prioridade. A tela da coleta abre o
+ * WhatsApp com o link pronto num clique; a mensagem de "informar até" continua
+ * saindo sozinha por e-mail, pelo cron, e com o mesmo link dentro. O que a
+ * analista faz à mão é o caminho rápido, não o segundo caminho.
  */
 export function proximoPasso(passo: Passo): ProximoPasso {
+  if (passo === "informar") return { tipo: "coleta", rotulo: "Enviar link" };
   if (passo === "planilha_recebida") return { tipo: "conferir", rotulo: "Conferir planilha" };
   if (passo === "conferida" || passo === "corte") {
     return { tipo: "anexar_boleto", rotulo: "Anexar boleto" };

@@ -46,9 +46,11 @@ insert into message_templates (kind, default_channel, subject, body) values
   (
     'inform', 'whatsapp',
     'Movimentação de {{mes}} — {{cliente}}',
-    'Olá, {{gestor}}! A movimentação de {{mes}} do seguro da {{cliente}} precisa chegar até {{data}}. Entre no portal e envie a planilha do mês: {{link}}
+    'Olá, {{gestor}}! A movimentação de {{mes}} do seguro da {{cliente}} precisa chegar até {{data}}.
 
-Se não houve mudanças, é só marcar "Não houve mudanças".
+É rápido, pelo celular: {{link}}
+
+Se ninguém entrou nem saiu, dá para confirmar isso no mesmo link.
 
 {{analista}} — {{corretora}}'
   ),
@@ -64,7 +66,7 @@ Se não houve mudanças, é só marcar "Não houve mudanças".
     'Boleto de {{mes}} — {{cliente}}',
     '{{gestor}}, o boleto de {{mes}} da {{cliente}} está disponível: {{valor}}, vencimento {{data_vencimento}}.
 
-Ele está no seu portal, em Meus documentos: {{link}}
+Ele vai anexado neste e-mail.
 
 {{analista}} — {{corretora}}'
   ),
@@ -78,7 +80,9 @@ Ele está no seu portal, em Meus documentos: {{link}}
   (
     'correction', 'whatsapp',
     'Planilha de {{mes}} — precisamos de um ajuste',
-    '{{gestor}}, a planilha de {{mes}} da {{cliente}} chegou, mas {{motivo}}. Pode reenviar pelo portal? {{link}}
+    '{{gestor}}, a planilha de {{mes}} da {{cliente}} chegou, mas {{motivo}}.
+
+Pode mandar de novo? É pelo mesmo link: {{link}}
 
 {{analista}} — {{corretora}}'
   )

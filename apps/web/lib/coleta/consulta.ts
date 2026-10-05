@@ -1,6 +1,6 @@
 import "server-only";
 
-import { estadoDoLink, pareceToken, protocoloDaColeta, type EstadoDoLink } from "../dominio/coleta";
+import { estadoDoLink, pareceToken, type EstadoDoLink } from "../dominio/coleta";
 import { formatarDocumento } from "../dominio/documento";
 import { hojeSaoPaulo } from "../dominio/hoje";
 import { paraMovimento, type LinhaMovimento } from "../dominio/mapear";
@@ -26,6 +26,14 @@ export type ColetaPublica = {
   estado: EstadoDoLink;
   controleId: string;
   competencia: string;
+  /**
+   * `MOV-000123`, o mesmo numero que a analista ve no Controle.
+   *
+   * Nasce por trigger no banco desde a migration base. Derivar um segundo
+   * protocolo para o gestor faria ele citar um numero que a analista nao acha —
+   * e a tela de sucesso existe justamente para ele ter como se referir ao
+   * envio.
+   */
   protocolo: string;
 
   /** Da empresa, travados na tela: vêm do cadastro, não do formulário. */
@@ -64,7 +72,7 @@ export async function lerColetaPorToken(token: string, hoje: string = hojeSaoPau
     const { data, error } = await supabase
       .from("monthly_controls")
       .select(
-        `id, competence, collection_expires_at, received_at, no_changes, received_note,
+        `id, competence, protocol, collection_expires_at, received_at, no_changes, received_note,
          manager_name, manager_phone, manager_sector,
          inform_date, cutoff_date, invoice_date, due_date,
          clients!inner(legal_name, trade_name, document, active, deleted_at),
@@ -82,6 +90,7 @@ export async function lerColetaPorToken(token: string, hoje: string = hojeSaoPau
     const linha = data as unknown as {
       id: string;
       competence: string;
+      protocol: string | null;
       collection_expires_at: string | null;
       received_at: string | null;
       no_changes: boolean;
@@ -139,7 +148,7 @@ export async function lerColetaPorToken(token: string, hoje: string = hojeSaoPau
       estado,
       controleId: linha.id,
       competencia,
-      protocolo: protocoloDaColeta(linha.id, competencia),
+      protocolo: linha.protocol ?? "",
       // O nome fantasia primeiro: é por ele que o gestor reconhece a empresa
       // dele. A razão social é o nome do contrato, e às vezes nem ele conhece.
       empresa: linha.clients.trade_name ?? linha.clients.legal_name,

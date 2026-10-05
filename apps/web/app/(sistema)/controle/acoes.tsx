@@ -53,6 +53,22 @@ export function Acoes({ linha, modelos }: { linha: LinhaDoControle; modelos: Mod
     return <MarcarPago linha={linha} rotulo={passo.rotulo} />;
   }
 
+  /**
+   * Em `informar` a ação é mandar o LINK, e não abrir a janela de mensagem.
+   * Decisão de 05/10: o WhatsApp é prioridade, e a tela da coleta abre a
+   * conversa com o link pronto num clique.
+   */
+  if (passo.tipo === "coleta") {
+    return (
+      <a
+        href={`/controle/${linha.id}/coleta`}
+        className="inline-flex min-h-[32px] items-center rounded-[6px] bg-brand px-2.5 text-[12px] font-[600] text-on-brand hover:bg-brand-hover"
+      >
+        {passo.rotulo}
+      </a>
+    );
+  }
+
   if (passo.tipo === "conferir") {
     return (
       <a

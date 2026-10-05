@@ -19,6 +19,7 @@ const PROTEGIDAS = [
   // Sob `/controle` o middleware ja protege por segmento; a prova fica porque
   // a tela mostra a relacao de vidas de uma empresa.
   "/controle/00000000-0000-0000-0000-000000000000/conferir",
+  "/controle/00000000-0000-0000-0000-000000000000/coleta",
   "/clientes",
   "/clientes/novo",
   "/configuracoes",
@@ -86,6 +87,39 @@ test.describe("conferir planilha", () => {
  * Anexar boleto grava valor a cobrar do cliente e sobe arquivo com dado
  * pessoal. As duas metades — ler o PDF e confirmar — exigem sessão.
  */
+/**
+ * Gerar o link de coleta e digitar a movimentação são da EQUIPE.
+ *
+ * O token é a credencial de quem vai informar as vidas de uma empresa. Se esta
+ * guarda cair, qualquer pessoa gera um link para qualquer cliente — e um link
+ * gerado é um link que a MX acha que mandou.
+ */
+test.describe("coleta pela equipe", () => {
+  const MES = "00000000-0000-0000-0000-000000000000";
+
+  test("gerar o link exige sessão", async ({ request }) => {
+    const resposta = await request.put(`/api/v1/controles/${MES}/coleta`, {
+      data: { nome: "Quem Tentou", celular: "55555555555" },
+    });
+    expect([401, 503]).toContain(resposta.status());
+    expect(resposta.ok()).toBe(false);
+  });
+
+  test("digitar a movimentação exige sessão", async ({ request }) => {
+    const resposta = await request.post(`/api/v1/controles/${MES}/coleta`, {
+      data: { nome: "Quem Tentou", celular: "55555555555", semMovimentacao: true, entradas: [], saidas: [] },
+    });
+    expect([401, 503]).toContain(resposta.status());
+    expect(resposta.ok()).toBe(false);
+  });
+
+  test("a recusa não devolve token nenhum", async ({ request }) => {
+    const resposta = await request.put(`/api/v1/controles/${MES}/coleta`, { data: { nome: "Quem Tentou" } });
+    const corpo = await resposta.text();
+    expect(corpo).not.toMatch(/coleta\/|token/i);
+  });
+});
+
 test.describe("anexar boleto", () => {
   const MES = "00000000-0000-0000-0000-000000000000";
 

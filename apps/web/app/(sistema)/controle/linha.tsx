@@ -83,15 +83,41 @@ export function Nome({ linha }: { linha: LinhaDoControle }) {
   );
 }
 
-/** "22/09 · WhatsApp · Boleto", ou um travessão quando nada saiu ainda. */
+/**
+ * "22/09 · WhatsApp · Boleto", ou o que o link de coleta já contou.
+ *
+ * O ESTADO DO LINK VENCE a última mensagem quando há um aberto, e é deliberado:
+ * em `informar` a pergunta da analista não é "o que eu mandei?", é "ele
+ * respondeu?". "22/09 · WhatsApp · Informar" diz que a mensagem saiu; "abriu e
+ * não enviou" diz que ela chegou, foi lida, e o mês continua parado — que é a
+ * linha que precisa de um telefonema.
+ *
+ * Sem link, volta a mostrar a mensagem: nos outros passos é isso que importa.
+ */
 export function UltimaMensagem({ linha }: { linha: LinhaDoControle }) {
+  const { coleta } = linha;
+
+  if (coleta.temLink && !linha.recebidaEm) {
+    return (
+      <span className={coleta.abertoEm ? "text-texto" : "text-muted"}>
+        {coleta.abertoEm
+          ? `link aberto ${curta(coleta.abertoEm)} · sem resposta`
+          : `link enviado${coleta.valeAte ? ` · vale até ${curta(coleta.valeAte)}` : ""}`}
+      </span>
+    );
+  }
+
   if (!linha.ultimaMensagem) return <span className="text-faint">—</span>;
 
   const { em, canal, modelo } = linha.ultimaMensagem;
   return (
     <span className="text-muted">
-      {`${em.slice(8, 10)}/${em.slice(5, 7)}`} · {canal === "email" ? "e-mail" : "WhatsApp"} ·{" "}
-      {ROTULO_MODELO[modelo]}
+      {curta(em)} · {canal === "email" ? "e-mail" : "WhatsApp"} · {ROTULO_MODELO[modelo]}
     </span>
   );
+}
+
+/** `2026-09-22T…` → `22/09`. A coluna é estreita, e o ano é sempre o corrente. */
+function curta(iso: string): string {
+  return `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
 }

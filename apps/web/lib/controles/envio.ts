@@ -7,6 +7,7 @@ import { enviarEmail } from "../email/enviar";
 import { canaisPossiveis, montarEmailDaMensagem } from "../dominio/mensagem";
 import { nomeCurto } from "../dominio/cliente";
 import { urlBase } from "../ambiente";
+import { lerTokenDoMes } from "./coleta";
 import type { ModeloDeMensagem } from "../dominio/controle";
 
 /**
@@ -61,6 +62,9 @@ export async function enviarMensagemDoPasso(
       return { ...nada, aviso: `${cliente} não tem e-mail nem celular do gestor no cadastro. Ninguém foi avisado.` };
     }
 
+    const token =
+      modelo === "informar" || modelo === "correcao" ? await lerTokenDoMes(controleId) : null;
+
     const email = montarEmailDaMensagem(salvo, {
       cliente,
       gestor: linha.gestorNome,
@@ -70,7 +74,9 @@ export async function enviarMensagemDoPasso(
       dataBoleto: linha.datas.boleto,
       dataVencimento: linha.datas.vencimento,
       valorDoBoleto: linha.valorDoBoleto,
-      link: `${urlBase()}/portal`,
+      // Só as mensagens que pedem movimentação levam link; as outras não têm
+            // para onde mandar. Ver a nota em `cron.ts`.
+      link: token ? `${urlBase()}/coleta/${token}` : "",
       seguradora: linha.seguradora,
       analista: linha.analista,
     });

@@ -152,27 +152,6 @@ export function diasParaFechar(valeAte: string, hoje: string): number {
 }
 
 /* --------------------------------------------------------------------------
-   O protocolo
-   -------------------------------------------------------------------------- */
-
-/**
- * `MX-2026-09-A1B2C3`: o número que a tela de sucesso mostra ao gestor.
- *
- * DERIVADO, e não uma coluna nova: ele é o mês e o id do mês escritos de outro
- * jeito. Uma coluna `protocol` guardaria a mesma informação num segundo lugar,
- * e a primeira vez que alguém corrigisse a competência os dois discordariam —
- * o gestor com um papel na mão e o sistema dizendo outro número.
- *
- * Seis dígitos hex do uuid: a competência já separa os meses, e dentro de uma
- * competência há 177 linhas. Não é identificador, é referência de conversa —
- * a analista acha o mês pelo cliente, e o protocolo confirma que é o mesmo.
- */
-export function protocoloDaColeta(controleId: string, competencia: string): string {
-  const curto = controleId.replaceAll("-", "").slice(0, 6).toUpperCase();
-  return `MX-${competencia}-${curto}`;
-}
-
-/* --------------------------------------------------------------------------
    As pessoas
    -------------------------------------------------------------------------- */
 

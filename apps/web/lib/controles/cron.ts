@@ -16,6 +16,7 @@ import { canaisPossiveis, montarEmailDaMensagem, ROTULO_MODELO } from "../domini
 import { nomeCurto } from "../dominio/cliente";
 import { enviarEmail } from "../email/enviar";
 import { registrarLog } from "../log";
+import { garantirLinkDeColeta } from "./coleta";
 import { abrirCompetencia } from "./servico";
 import { aplicarRetencao } from "./retencao";
 import { primeiroDia } from "./consulta";
@@ -177,7 +178,7 @@ export async function rodarODia(hoje: string, supabase: Cliente): Promise<Resumo
     if (!modelo) continue;
     if (jaSaiu.has(`${linha.id}:${deModelo(modelo)}`)) continue;
 
-    await enviarDoDia(supabase, linha, datas, modelo, modelos, portal, resumo);
+    await enviarDoDia(supabase, linha, datas, modelo, modelos, portal, hoje, resumo);
   }
 
   // A retencao vem DEPOIS das mensagens: se ela estourar o tempo da funcao, o
@@ -247,6 +248,7 @@ async function enviarDoDia(
   modelo: ModeloDeMensagem,
   modelos: Modelos,
   portal: string,
+  hoje: string,
   resumo: ResumoDoDia,
 ): Promise<void> {
   // Modelo ausente é seed incompleto. Sair calado é melhor que mandar uma
@@ -265,6 +267,16 @@ async function enviarDoDia(
     return;
   }
 
+  const token =
+    modelo === "informar" || modelo === "correcao"
+      ? await garantirLinkDeColeta(
+          linha.id,
+          { nome: linha.manager_name ?? "", celular: linha.manager_phone ?? "", setor: null },
+          supabase,
+          hoje,
+        )
+      : null;
+
   // Um contexto só para o corpo e para o assunto: com dois, um `{{data}}` no
   // assunto renderizaria vazio enquanto o mesmo `{{data}}` no corpo aparecia.
   const contexto = {
@@ -277,7 +289,16 @@ async function enviarDoDia(
     dataBoleto: datas.boleto,
     dataVencimento: datas.vencimento,
     valorDoBoleto: linha.invoice_amount === null ? null : Number(linha.invoice_amount),
-    link: `${portal}/portal`,
+    /**
+     * O link de coleta, e so onde ele significa algo.
+     *
+     * `inform` e `correction` PEDEM movimentação, e sem endereço o gestor não
+     * tem por onde responder. As outras não pedem nada de volta: o boleto vai
+     * anexado, e o aviso de corte e de vencimento são informativos. Nelas o
+     * `{{link}}` renderiza vazio, que é o certo — melhor faltar que mandar a
+     * pessoa a uma tela de login que ela não tem como usar.
+     */
+    link: token ? `${portal}/coleta/${token}` : "",
     seguradora: linha.insurer_name,
     analista: linha.analyst_name,
   };

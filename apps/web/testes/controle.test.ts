@@ -207,7 +207,16 @@ describe("mensagem e próximo passo", () => {
   });
 
   it("o botão muda com o passo", () => {
-    expect(proximoPasso("informar")).toEqual({ tipo: "mensagem", modelo: "informar", rotulo: "Enviar mensagem" });
+    /**
+     * Em `informar` o botão manda o LINK, e não abre a janela de mensagem.
+     *
+     * Decisão do Gabriel, 05/10: o envio pelo WhatsApp é prioridade. A tela da
+     * coleta abre a conversa com o link pronto num clique. A mensagem de
+     * "informar até" continua saindo sozinha por e-mail, pelo cron, com o mesmo
+     * link dentro — `mensagemDoPasso("informar")` segue valendo, e é o teste
+     * acima que guarda isso.
+     */
+    expect(proximoPasso("informar")).toEqual({ tipo: "coleta", rotulo: "Enviar link" });
     expect(proximoPasso("planilha_recebida").tipo).toBe("conferir");
     expect(proximoPasso("conferida").tipo).toBe("anexar_boleto");
     expect(proximoPasso("corte").tipo).toBe("anexar_boleto");
