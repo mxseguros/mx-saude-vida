@@ -118,7 +118,18 @@ jobs:
       - name: Zerar o banco da prova
         run: |
           psql "$DESTINO" -v ON_ERROR_STOP=1 -c "drop schema if exists public cascade"
-          psql "$DESTINO" -tAc "select count(*) from pg_tables where schemaname='public'"
+
+          # RECRIAR o schema e obrigatorio, e nao enfeite: extensao se instala
+          # DENTRO de `public`, e sem ele o `create extension citext` falha —
+          # foi assim que a primeira versao deste job pulou todas as extensoes e
+          # morreu depois em "type public.citext does not exist".
+          #
+          # O dump traz `CREATE SCHEMA public`, entao ele e criado aqui e
+          # derrubado de novo pelo proprio restore? Nao: `pg_dump --schema=public`
+          # emite `CREATE SCHEMA` so quando o schema nao e o padrao. Como ele e,
+          # o restore assume que existe — que e exatamente o que queremos.
+          psql "$DESTINO" -v ON_ERROR_STOP=1 -c "create schema public"
+          echo "tabelas em public: $(psql "$DESTINO" -tAc "select count(*) from pg_tables where schemaname='public'")"
 
       # As EXTENSOES nao vem no dump limitado ao schema `public`, e sem elas a
       # restauracao para: `clients.manager_email` e `citext`, e o tipo nao
