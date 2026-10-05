@@ -43,11 +43,6 @@ values
   ('a0000000-0000-0000-0000-000000000001', 'Cliente A Ltda', 'Cliente A', '99999999000191', 'life', 8, 10, 16, 30),
   ('b0000000-0000-0000-0000-000000000002', 'Cliente B Ltda', 'Cliente B', '99999998000100', 'life', 20, 25, 26, 10);
 
-insert into client_users (id, client_id, full_name)
-values
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'a0000000-0000-0000-0000-000000000001', 'Gestor A'),
-  ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'b0000000-0000-0000-0000-000000000002', 'Gestor B');
-
 insert into monthly_controls (id, client_id, competence, step, inform_date, cutoff_date, invoice_date, due_date)
 values
   ('c0000000-0000-0000-0000-00000000000a', 'a0000000-0000-0000-0000-000000000001', date '2026-09-01', 'inform',
@@ -117,7 +112,6 @@ set local role anon;
 
 select pg_temp.exigir((select count(*) from clients) = 0, 'anonimo enxergou clientes');
 select pg_temp.exigir((select count(*) from profiles) = 0, 'anonimo enxergou a equipe');
-select pg_temp.exigir((select count(*) from client_users) = 0, 'anonimo enxergou os usuarios do portal');
 select pg_temp.exigir((select count(*) from monthly_controls) = 0, 'anonimo enxergou o controle');
 select pg_temp.exigir((select count(*) from client_files) = 0, 'anonimo enxergou arquivos');
 select pg_temp.exigir((select count(*) from messages) = 0, 'anonimo enxergou mensagens');
@@ -232,102 +226,69 @@ select pg_temp.exigir_recusa(
 );
 
 -- ===========================================================================
--- 6. O CLIENTE so enxerga o que e dele
+-- 6. Conta autenticada SEM perfil nao ve nada
 --
--- A propriedade mais importante do portal: o gestor do cliente A nao pode ver
--- nada do cliente B — nem o cadastro, nem o controle, nem a planilha, nem a
--- mensagem.
+-- Antes havia um segundo publico: quem tinha linha em `client_users` enxergava
+-- o proprio `client_id`. A coleta por link acabou com ele — o gestor nao tem
+-- conta, o link e o acesso dele.
+--
+-- O que este caso guarda e o que sobrou disso: um token valido de alguem que
+-- nao esta na equipe nao alcanca NADA. E a situacao de uma conta antiga de
+-- portal que ficou no Auth depois da remocao, e da conta criada no Auth cujo
+-- insert em `profiles` falhou no meio.
+--
+-- Vale a pena testar porque falha em silencio: se uma politica voltar a
+-- liberar por `auth.uid()` em vez de por perfil ativo, nada da erro.
 -- ===========================================================================
 set local request.jwt.claims to '{"sub":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","role":"authenticated"}';
 
-select pg_temp.exigir((select count(*) from clients) = 1, 'cliente A enxergou mais de um cadastro');
-select pg_temp.exigir(
-  (select id from clients) = 'a0000000-0000-0000-0000-000000000001',
-  'cliente A enxergou o cadastro errado'
-);
-select pg_temp.exigir((select count(*) from monthly_controls) = 1, 'cliente A enxergou controle de outro cliente');
-select pg_temp.exigir(
-  (select count(*) from monthly_controls where client_id = 'b0000000-0000-0000-0000-000000000002') = 0,
-  'cliente A enxergou o controle do cliente B'
-);
-select pg_temp.exigir((select count(*) from client_files) = 1, 'cliente A enxergou arquivo de outro cliente');
-select pg_temp.exigir((select count(*) from messages) = 1, 'cliente A enxergou mensagem de outro cliente');
-select pg_temp.exigir((select count(*) from v_control_board) = 1, 'cliente A enxergou outro cliente pela view do controle');
-select pg_temp.exigir((select count(*) from v_client_documents) = 1, 'cliente A enxergou documento de outro cliente pela view');
+select pg_temp.exigir((select count(*) from clients) = 0, 'conta sem perfil enxergou clientes');
+select pg_temp.exigir((select count(*) from monthly_controls) = 0, 'conta sem perfil enxergou o controle');
+select pg_temp.exigir((select count(*) from client_files) = 0, 'conta sem perfil enxergou arquivos');
+select pg_temp.exigir((select count(*) from messages) = 0, 'conta sem perfil enxergou mensagens');
+select pg_temp.exigir((select count(*) from control_events) = 0, 'conta sem perfil enxergou a linha do tempo');
+select pg_temp.exigir((select count(*) from v_control_board) = 0, 'conta sem perfil enxergou a view do controle');
+select pg_temp.exigir((select count(*) from v_client_documents) = 0, 'conta sem perfil enxergou a view de documentos');
 
--- O que e so da equipe.
-select pg_temp.exigir((select count(*) from profiles) = 0, 'cliente enxergou a equipe');
-select pg_temp.exigir((select count(*) from control_events) = 0, 'cliente enxergou a linha do tempo interna');
-select pg_temp.exigir((select count(*) from message_templates) = 0, 'cliente enxergou os modelos de mensagem');
-select pg_temp.exigir((select count(*) from client_users) = 1, 'cliente enxergou outros usuarios do portal');
-
--- O cliente nao muda o proprio passo nem o proprio cadastro: quem grava e o servidor.
-with alterado as (
-  update monthly_controls set step = 'done' where id = 'c0000000-0000-0000-0000-00000000000a' returning 1
-)
-select pg_temp.exigir((select count(*) from alterado) = 0, 'cliente mudou o passo do proprio controle');
-
-with alterado as (
-  update clients set due_day = 28 where id = 'a0000000-0000-0000-0000-000000000001' returning 1
-)
-select pg_temp.exigir((select count(*) from alterado) = 0, 'cliente mudou a propria regra de vencimento');
-
--- Envia planilha para si, em nome proprio.
-insert into client_files (client_id, kind, storage_path, original_name, size_bytes, mime, uploaded_by_client_user)
-values ('a0000000-0000-0000-0000-000000000001', 'spreadsheet',
-        'a0000000-0000-0000-0000-000000000001/2026-09/enviada-pelo-cliente.xlsx', 'enviada-pelo-cliente.xlsx', 20,
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa');
-
--- Nao envia para o cliente B.
+-- Nem escreve. A planilha que chega pelo link entra pelo servidor, com a chave
+-- de administracao, depois de o token ser conferido.
 select pg_temp.exigir_recusa(
-  $$insert into client_files (client_id, kind, storage_path, original_name, size_bytes, mime, uploaded_by_client_user)
-    values ('b0000000-0000-0000-0000-000000000002', 'spreadsheet',
-            'b0000000-0000-0000-0000-000000000002/2026-09/invasao.xlsx', 'invasao.xlsx', 20,
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')$$,
-  'cliente A enviou arquivo para o cliente B'
+  $$insert into client_files (client_id, kind, storage_path, original_name, size_bytes, mime)
+    values ('a0000000-0000-0000-0000-000000000001', 'spreadsheet',
+            'a0000000-0000-0000-0000-000000000001/2026-09/pela-porta-dos-fundos.xlsx',
+            'pela-porta-dos-fundos.xlsx', 20,
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')$$,
+  'conta sem perfil enviou arquivo'
 );
 
--- Nao escreve na linha do tempo. E por isso que o envio pelo portal passa pelo
--- servidor com a chave de administracao (lib/portal/servico.ts): o cliente
--- provoca o evento, mas nao e ele quem o grava.
 select pg_temp.exigir_recusa(
-  $$insert into control_events (control_id, type, origin, actor_client_user_id, from_step, to_step)
+  $$insert into control_events (control_id, type, origin, from_step, to_step)
     values ('c0000000-0000-0000-0000-00000000000a', 'spreadsheet_received', 'client',
-            'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'inform', 'spreadsheet_received')$$,
-  'cliente gravou evento na linha do tempo'
-);
-
--- Nem se tentar se passar por alguem da equipe.
-select pg_temp.exigir_recusa(
-  $$insert into control_events (control_id, type, origin, actor_profile_id, from_step, to_step)
-    values ('c0000000-0000-0000-0000-00000000000a', 'checked', 'staff',
-            '11111111-1111-1111-1111-111111111111', 'spreadsheet_received', 'checked')$$,
-  'cliente gravou evento assinado pela equipe'
-);
-
--- Nao envia boleto nem apolice: so planilha.
-select pg_temp.exigir_recusa(
-  $$insert into client_files (client_id, kind, storage_path, original_name, size_bytes, mime, uploaded_by_client_user)
-    values ('a0000000-0000-0000-0000-000000000001', 'invoice',
-            'a0000000-0000-0000-0000-000000000001/2026-09/boleto-falso.pdf', 'boleto-falso.pdf', 20,
-            'application/pdf', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')$$,
-  'cliente enviou boleto — so a equipe anexa boleto'
+            'inform', 'spreadsheet_received')$$,
+  'conta sem perfil gravou evento na linha do tempo'
 );
 
 -- ===========================================================================
--- 7. Cliente INATIVADO perde o portal na hora
+-- 7. Cliente inativado FICA no historico da equipe
+--
+-- Regra 5 do CLAUDE.md: remover e desativar. O cadastro sai da operacao e
+-- continua respondendo pela analista — se a RLS passar a esconde-lo, o mes
+-- fechado do cliente desaparece da tela junto.
 -- ===========================================================================
 reset role;
 update clients set active = false, deleted_at = now() where id = 'a0000000-0000-0000-0000-000000000001';
 
 set local role authenticated;
-set local request.jwt.claims to '{"sub":"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa","role":"authenticated"}';
+set local request.jwt.claims to '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}';
 
-select pg_temp.exigir((select count(*) from clients) = 0, 'cliente inativado continuou vendo o cadastro');
-select pg_temp.exigir((select count(*) from monthly_controls) = 0, 'cliente inativado continuou vendo o controle');
-select pg_temp.exigir((select count(*) from client_files) = 0, 'cliente inativado continuou vendo os arquivos');
+select pg_temp.exigir(
+  (select count(*) from clients where id = 'a0000000-0000-0000-0000-000000000001') = 1,
+  'cliente inativado desapareceu para a analista'
+);
+select pg_temp.exigir(
+  (select count(*) from monthly_controls where client_id = 'a0000000-0000-0000-0000-000000000001') = 1,
+  'o controle do cliente inativado desapareceu para a analista'
+);
 
 -- ===========================================================================
 -- 8. O bloqueio de login so muda pelo servidor

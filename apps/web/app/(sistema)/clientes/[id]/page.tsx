@@ -3,21 +3,18 @@ import { notFound } from "next/navigation";
 
 import { TopoPagina } from "@/app/_admin/moldura";
 import { lerCliente, listarAcervo, listarBoletos, listarSeguradoras } from "@/lib/clientes/consulta";
-import { listarAcessos } from "@/lib/clientes/acesso";
 import { nomeCurto } from "@/lib/dominio/cliente";
 
 import { FormularioCliente } from "../formulario";
-import { AcessoAoPortal } from "./acesso-ao-portal";
 import { Acervo } from "./acervo";
 
 export const metadata: Metadata = { title: "Cliente" };
 
 export default async function PaginaCliente({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [cliente, seguradoras, acessos, boletos, documentos] = await Promise.all([
+  const [cliente, seguradoras, boletos, documentos] = await Promise.all([
     lerCliente(id),
     listarSeguradoras(),
-    listarAcessos(id),
     listarBoletos(id),
     listarAcervo(id),
   ]);
@@ -53,15 +50,6 @@ export default async function PaginaCliente({ params }: { params: Promise<{ id: 
           {/* Depois do formulário de propósito: o acesso ao portal é consequência
               do cadastro, e quem abre esta tela quase sempre vem conferir ou
               corrigir um campo, não dar acesso. */}
-          <AcessoAoPortal
-            clienteId={id}
-            acessos={acessos.dados}
-            nomeDoCliente={nomeCurto(cliente.dados)}
-            nomeDoGestor={cliente.dados.gestorNome}
-            emailDoGestor={cliente.dados.gestorEmail}
-            celularDoGestor={cliente.dados.gestorCelular}
-          />
-
           {/* Por último: é consulta, não cadastro. Quem abre esta tela vem
               corrigir um campo; o acervo é para quando o cliente ligou. */}
           <Acervo boletos={boletos.dados} documentos={documentos.dados} />

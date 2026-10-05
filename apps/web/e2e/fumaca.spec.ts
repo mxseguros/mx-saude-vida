@@ -22,10 +22,6 @@ const PROTEGIDAS = [
   "/clientes",
   "/clientes/novo",
   "/configuracoes",
-  // O portal do cliente também exige sessão: o que muda é o perfil de quem entra.
-  "/portal",
-  "/portal/enviar",
-  "/portal/documentos",
 ];
 
 test.describe("limite de autenticação", () => {
@@ -44,11 +40,10 @@ test.describe("limite de autenticação", () => {
   }
 
   /**
-   * A raiz decide o público (equipe → Controle, cliente → portal), então ela é
-   * a única rota que não dá para checar mais do que isto aqui: sem banco, esta
-   * suíte faz a raiz cair em "indisponível", e não em "sem sessão". Que ela
-   * mande ao login SEM `destino` — para um gestor de cliente não ser jogado no
-   * Controle depois de entrar — é conferido contra produção.
+   * A raiz só redireciona para o Controle, e o middleware barra antes de a
+   * página rodar. Sem banco esta suíte faz a raiz cair em "indisponível", e
+   * não em "sem sessão" — as duas mandam ao login, e é só isso que se prova
+   * aqui.
    */
   test("a rota raiz não expõe nada sem sessão", async ({ page }) => {
     await page.goto("/");
@@ -56,52 +51,6 @@ test.describe("limite de autenticação", () => {
   });
 });
 
-/**
- * As rotas do portal.
- *
- * Elas carregam a relação de vidas de uma empresa — nome, CPF e nascimento de
- * cada funcionário. Se a guarda cair, nada dá erro: a resposta simplesmente
- * passa a sair para quem não deveria.
- */
-test.describe("API do portal", () => {
-  const ROTAS: { metodo: "GET" | "POST"; caminho: string }[] = [
-    { metodo: "POST", caminho: "/api/portal/planilha" },
-    { metodo: "POST", caminho: "/api/portal/envio" },
-    { metodo: "GET", caminho: "/api/portal/arquivo/00000000-0000-0000-0000-000000000000" },
-  ];
-
-  for (const rota of ROTAS) {
-    test(`${rota.caminho} exige sessão`, async ({ request }) => {
-      const resposta =
-        rota.metodo === "GET" ? await request.get(rota.caminho) : await request.post(rota.caminho, { data: {} });
-
-      // 401 quando há banco e não há sessão; 503 nesta suíte, que roda sem
-      // banco — a guarda não consegue nem perguntar quem é. As duas recusam, e
-      // a propriedade é que NENHUMA delas serve o conteúdo.
-      expect([401, 503]).toContain(resposta.status());
-      expect(resposta.ok()).toBe(false);
-    });
-  }
-
-  test("a recusa não conta nada sobre a empresa", async ({ request }) => {
-    const resposta = await request.post("/api/portal/envio", { data: { controle: "qualquer" } });
-    const corpo = await resposta.text();
-
-    // Quem bate na porta errada não fica sabendo o que há atrás dela.
-    expect(corpo).not.toMatch(/cnpj|razao|razão|planilha de|competence/i);
-  });
-});
-
-/**
- * Criar acesso ao portal é da EQUIPE, e cria conta no Auth.
- *
- * Se a guarda cair, qualquer pessoa cria login de cliente — e um login de
- * cliente alcança a relação de vidas de uma empresa.
- */
-/**
- * Anexar boleto grava valor a cobrar do cliente e sobe arquivo com dado
- * pessoal. As duas metades — ler o PDF e confirmar — exigem sessão.
- */
 /**
  * Conferir planilha abre o xlsx do cliente — nome, CPF e nascimento de cada
  * funcionario. As tres rotas exigem sessao.
@@ -133,6 +82,10 @@ test.describe("conferir planilha", () => {
   });
 });
 
+/**
+ * Anexar boleto grava valor a cobrar do cliente e sobe arquivo com dado
+ * pessoal. As duas metades — ler o PDF e confirmar — exigem sessão.
+ */
 test.describe("anexar boleto", () => {
   const MES = "00000000-0000-0000-0000-000000000000";
 
@@ -148,22 +101,6 @@ test.describe("anexar boleto", () => {
     const resposta = await request.post(`/api/v1/controles/${MES}/boleto`, {
       data: { arquivo: MES, valor: "R$ 1,00", vencimento: "2026-10-30" },
     });
-    expect([401, 503]).toContain(resposta.status());
-    expect(resposta.ok()).toBe(false);
-  });
-});
-
-test.describe("acesso ao portal", () => {
-  const CLIENTE = "00000000-0000-0000-0000-000000000000";
-
-  test("criar acesso exige sessão", async ({ request }) => {
-    const resposta = await request.post(`/api/v1/clientes/${CLIENTE}/acesso`, { data: {} });
-    expect([401, 503]).toContain(resposta.status());
-    expect(resposta.ok()).toBe(false);
-  });
-
-  test("trocar senha de um acesso exige sessão", async ({ request }) => {
-    const resposta = await request.patch(`/api/v1/clientes/${CLIENTE}/acesso/${CLIENTE}`, { data: { senha: "x" } });
     expect([401, 503]).toContain(resposta.status());
     expect(resposta.ok()).toBe(false);
   });

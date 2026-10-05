@@ -63,7 +63,14 @@ export async function enviarArquivo(
     tipo: TipoDeArquivo;
     arquivo: File;
   },
-  autor: { perfilId: string } | { clienteUsuarioId: string },
+  /**
+   * Quem enviou. `null` = veio pelo LINK de coleta.
+   *
+   * O gestor que preenche o formulário não tem conta: o link é o acesso dele.
+   * Então o arquivo nasce sem autor em `profiles`, e quem mandou se lê no
+   * contato do mês (`manager_name`), que é onde o nome dele está.
+   */
+  autor: { perfilId: string } | null,
 ): Promise<ResultadoEscrita<ArquivoGravado>> {
   const { clienteId, controleId, competencia, tipo, arquivo } = parametros;
 
@@ -109,10 +116,7 @@ export async function enviarArquivo(
       mime: arquivo.type || "application/octet-stream",
     };
 
-    // Um autor, nunca os dois: `client_files_um_autor` é um check no banco, e a
-    // política do cliente exige que seja ele mesmo.
-    if ("perfilId" in autor) ficha.uploaded_by_profile = autor.perfilId;
-    else ficha.uploaded_by_client_user = autor.clienteUsuarioId;
+    if (autor) ficha.uploaded_by_profile = autor.perfilId;
 
     const { data, error } = await supabase.from("client_files").insert(ficha).select("id").single();
 

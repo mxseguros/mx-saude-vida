@@ -27,7 +27,7 @@ Controle mensal de seguros saúde, vida e odonto. Base clonada **por cópia** do
 7. **Função de banco que escreve checa o papel explicitamente.** `security definer` tem `revoke` de `anon` e `authenticated`. Views sempre com `security_invoker`.
 8. **O middleware nunca lança.** Rota protegida nova entra em `ROTAS_PROTEGIDAS` e em `e2e/fumaca.spec.ts` no mesmo commit. Acesso tem quatro estados: ok, sem sessão, sem acesso, indisponível.
 9. **Autorização sempre por `lib/api.ts`**: `exigirPerfil`, `exigirEscrita`, `exigirAdmin`. O perfil `leitura` não altera nada.
-10. **Dois públicos.** `(sistema)` é da equipe; `(portal)` é do cliente, que só enxerga o próprio `client_id`. A RLS faz essa pergunta no banco; a rota faz de novo.
+10. **Um público logado só: a equipe.** O cliente não tem conta — o gestor recebe um **link** de coleta e preenche sem senha. Nenhuma política de RLS para `anon`: a rota pública confere o token no servidor e escreve com a chave de administração.
 11. **A chave secreta vive só em `lib/supabase/administrador.ts` e nos scripts.**
 12. **IA propõe, código decide.** Só a leitura do PDF da apólice usa modelo. Prompt versionado, teto diário, cache por hash, `ai_runs` como livro-caixa. A conferência da planilha é código.
 13. **Log estruturado sem dado pessoal** (`lib/log.ts`). Todo 5xx é registrado com código e status, nunca com a mensagem.

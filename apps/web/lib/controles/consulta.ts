@@ -230,7 +230,7 @@ export type PlanilhaDoMes = {
   nome: string;
   tamanho: number | null;
   enviadaEm: string;
-  /** Quem enviou: o gestor pelo portal, ou alguém da MX. */
+  /** Quem da MX anexou. `null` quando veio pelo link de coleta. */
   porQuem: string | null;
   pelaMX: boolean;
 };
@@ -242,7 +242,7 @@ export async function lerPlanilhaDoMes(controleId: string): Promise<Resultado<Pl
     const { data, error } = await supabase
       .from("client_files")
       .select(
-        "id, original_name, size_bytes, created_at, uploaded_by_profile, uploaded_by_client_user, profiles:uploaded_by_profile(full_name), client_users:uploaded_by_client_user(full_name)",
+        "id, original_name, size_bytes, created_at, uploaded_by_profile, profiles:uploaded_by_profile(full_name)",
       )
       .eq("control_id", controleId)
       .eq("kind", "spreadsheet")
@@ -263,12 +263,10 @@ export async function lerPlanilhaDoMes(controleId: string): Promise<Resultado<Pl
       created_at: string;
       uploaded_by_profile: string | null;
       profiles: { full_name: string } | { full_name: string }[] | null;
-      client_users: { full_name: string } | { full_name: string }[] | null;
     };
 
     const um = <T,>(v: T | T[] | null): T | null => (Array.isArray(v) ? (v[0] ?? null) : v);
     const daEquipe = um(linha.profiles);
-    const doCliente = um(linha.client_users);
 
     return {
       dados: {
@@ -276,7 +274,7 @@ export async function lerPlanilhaDoMes(controleId: string): Promise<Resultado<Pl
         nome: linha.original_name,
         tamanho: linha.size_bytes,
         enviadaEm: linha.created_at,
-        porQuem: daEquipe?.full_name ?? doCliente?.full_name ?? null,
+        porQuem: daEquipe?.full_name ?? null,
         pelaMX: linha.uploaded_by_profile !== null,
       },
       erro: null,

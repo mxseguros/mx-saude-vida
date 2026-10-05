@@ -96,9 +96,9 @@ Nada disso **impede** conferir — aponta, como já é com o campo em branco. Qu
 
 ### Fase 1 — Tirar o portal *(~0,5 dia)*
 
-- [ ] **1.1** Remover `(portal)`, `lib/portal`, `api/portal` e a seção de acesso na ficha
-- [ ] **1.2** Migration: remover `client_users` e suas políticas; simplificar a raiz e as molduras
-- [ ] **1.3** Tirar os casos de `client_users` do teste de RLS e as rotas do smoke
+- [x] **1.1** Remover `(portal)`, `lib/portal`, `api/portal` e a seção de acesso na ficha
+- [x] **1.2** Migration: remover `client_users` e suas políticas; simplificar a raiz e as molduras
+- [x] **1.3** Tirar os casos de `client_users` do teste de RLS e as rotas do smoke
 
 ### Fase 2 — O banco da coleta *(~0,5 dia)*
 

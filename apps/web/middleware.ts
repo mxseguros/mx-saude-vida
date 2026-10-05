@@ -11,18 +11,10 @@ import { renovarSessao } from "@/lib/supabase/middleware";
  * redirect, sempre, e ha um try/catch de ultimo recurso no fim.
  */
 
-const ROTAS_PROTEGIDAS = ["/controle", "/clientes", "/configuracoes", "/portal"];
+const ROTAS_PROTEGIDAS = ["/controle", "/clientes", "/configuracoes"];
 
-/**
- * Para onde vai quem entrou sem destino declarado.
- *
- * A RAIZ, e nao `/controle`: o sistema tem dois publicos na mesma porta, e
- * quem decide entre eles e `app/page.tsx`, que consegue consultar o banco. O
- * middleware nao sabe se a sessao e da equipe ou de um cliente, e mandar todo
- * mundo ao Controle jogava o gestor do cliente em `/sem-acesso` logo depois de
- * acertar a senha.
- */
-const DESTINO_PADRAO = "/";
+/** Para onde vai quem entrou sem destino declarado. */
+const DESTINO_PADRAO = "/controle";
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
