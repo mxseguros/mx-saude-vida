@@ -216,6 +216,14 @@ test.describe("coleta por link", () => {
     await expect(page.locator("main")).toBeVisible();
   });
 
+  // O cartão do WhatsApp sai da og:image; sem ela a mensagem vai sem imagem.
+  test("o link tem a imagem do cartão do WhatsApp", async ({ page }) => {
+    await page.goto(`/coleta/${TOKEN}`);
+    await expect(page.locator('meta[property="og:image"]')).toHaveAttribute("content", /\/og-coleta\.png$/);
+    const imagem = await page.request.get("/og-coleta.png");
+    expect(imagem.status()).toBe(200);
+  });
+
   test("um só marco de página — dois confundem o leitor de tela", async ({ page }) => {
     await page.goto(`/coleta/${TOKEN}`);
     await expect(page.locator("main")).toHaveCount(1);

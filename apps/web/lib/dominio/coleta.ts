@@ -346,3 +346,13 @@ export function movimentosDaColeta(dados: DadosDaColeta, porQuem: QuemDigitou): 
     })),
   ];
 }
+
+/**
+ * O acesso é de um robô que monta a prévia do link (WhatsApp, Telegram,
+ * Facebook, Slack...)? Esses acessos chegam antes do gestor abrir.
+ */
+export function roboDePrevia(userAgent: string | null): boolean {
+  return /whatsapp|facebookexternalhit|facebot|telegrambot|slackbot|twitterbot|linkedinbot|discordbot|skypeuripreview|googlebot|bingbot/i.test(
+    userAgent ?? "",
+  );
+}

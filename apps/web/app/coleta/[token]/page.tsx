@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 
+import { urlBase } from "@/lib/ambiente";
 import { lerColetaPorToken } from "@/lib/coleta/consulta";
 import { marcarLinkAberto } from "@/lib/coleta/servico";
+import { roboDePrevia } from "@/lib/dominio/coleta";
 
 import { SemColeta } from "./sem-coleta";
 import { Wizard } from "./wizard";
@@ -41,6 +44,26 @@ export const metadata: Metadata = {
     title: "Movimentação do mês · MX Corretora de Seguros",
     description: "Informe quem entrou e quem saiu no mês. Leva menos de dois minutos.",
     locale: "pt_BR",
+    // A imagem do cartão (07/10), gerada por `scripts/gerar-og.py`. URL
+    // absoluta, com tipo e endereço seguro: o WhatsApp não resolve caminho
+    // relativo, e alguns leitores descartam a imagem sem os dois. Sem `og:url`:
+    // o robô buscaria a página sem o token.
+    images: [
+      {
+        url: `${urlBase()}/og-coleta.png`,
+        secureUrl: `${urlBase()}/og-coleta.png`,
+        type: "image/png",
+        width: 1200,
+        height: 630,
+        alt: "MX Corretora de Seguros",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Movimentação do mês · MX Corretora de Seguros",
+    description: "Informe quem entrou e quem saiu no mês. Leva menos de dois minutos.",
+    images: [`${urlBase()}/og-coleta.png`],
   },
 };
 
@@ -54,7 +77,9 @@ export default async function PaginaDeColeta({ params }: { params: Promise<{ tok
   // O carimbo de "abriu" não espera: `await` aqui atrasaria a primeira pintura
   // da página por um dado que é de conveniência. A função engole a própria
   // falha de propósito — ver o formulário importa mais que registrar a visita.
-  void marcarLinkAberto(token);
+  // O WhatsApp abre o link sozinho para montar o cartão da mensagem: esse
+  // acesso não é o gestor, e marcá-lo diria "abriu" antes de ele ver.
+  if (!roboDePrevia((await headers()).get("user-agent"))) void marcarLinkAberto(token);
 
   // O wizard já traz o seu <main>: dois marcos de página confundem o leitor de
   // tela e fazem `locator("main")` achar dois na prova.

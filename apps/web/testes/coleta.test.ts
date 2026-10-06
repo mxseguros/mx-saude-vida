@@ -8,6 +8,7 @@ import {
   diasParaFechar,
   estadoDoLink,
   pareceToken,
+  roboDePrevia,
   esquemaColeta,
   movimentosDaColeta,
   tokenDeColeta,
@@ -366,5 +367,17 @@ describe("entrada com dados de inclusão (06/10)", () => {
     if (!r.ok) return;
     const [saida] = movimentosDaColeta(r.dados, "gestor");
     expect(saida).toMatchObject({ tipo: "saida", nascimento: null, cargo: null, salario: null });
+  });
+});
+
+describe("robô de prévia não conta como abertura", () => {
+  it("reconhece o WhatsApp e os outros leitores de cartão", () => {
+    expect(roboDePrevia("WhatsApp/2.23.20.0 A")).toBe(true);
+    expect(roboDePrevia("facebookexternalhit/1.1")).toBe(true);
+    expect(roboDePrevia("TelegramBot (like TwitterBot)")).toBe(true);
+  });
+  it("celular de gente é abertura", () => {
+    expect(roboDePrevia("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/128 Mobile Safari/537.36")).toBe(false);
+    expect(roboDePrevia(null)).toBe(false);
   });
 });
