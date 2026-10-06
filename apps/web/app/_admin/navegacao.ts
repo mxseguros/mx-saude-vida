@@ -28,7 +28,13 @@ export type GrupoMenu = {
   itens: ItemMenu[];
 };
 
-export function montarMenu(contadores?: { pendentes?: number; vencidos?: number }): GrupoMenu[] {
+export function montarMenu(contadores?: {
+  pendentes?: number;
+  vencidos?: number;
+  /** Atrasados + hoje; `alertasAtrasados` pinta a medalha de vermelho. */
+  alertas?: number;
+  alertasAtrasados?: number;
+}): GrupoMenu[] {
   return [
     {
       titulo: "Operação",
@@ -39,6 +45,13 @@ export function montarMenu(contadores?: { pendentes?: number; vencidos?: number 
           contagem: contadores?.pendentes,
           atencao: contadores?.vencidos,
           icone: "controle",
+        },
+        {
+          href: "/alertas",
+          rotulo: "Alertas",
+          contagem: contadores?.alertas,
+          atencao: contadores?.alertasAtrasados,
+          icone: "alertas",
         },
         { href: "/clientes", rotulo: "Clientes", icone: "clientes" },
       ],

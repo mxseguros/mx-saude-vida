@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 
 import { Moldura } from "@/app/_admin/moldura";
+import { lerAlertas } from "@/lib/alertas/consulta";
+import { contarUrgentes } from "@/lib/dominio/alerta";
 import { situacaoDoAcesso } from "@/lib/supabase/servidor";
 
 /**
@@ -46,5 +48,13 @@ export default async function LayoutDoSistema({
     throw new Error("banco indisponivel");
   }
 
-  return <Moldura perfil={acesso.perfil}>{children}</Moldura>;
+  // O sino conta em toda página. Falhou, o menu segue sem número — nunca a tela.
+  const alertas = await lerAlertas();
+  const sino = alertas.erro ? undefined : contarUrgentes(alertas.dados);
+
+  return (
+    <Moldura perfil={acesso.perfil} alertas={sino}>
+      {children}
+    </Moldura>
+  );
 }

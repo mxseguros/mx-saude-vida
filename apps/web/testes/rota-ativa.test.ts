@@ -34,9 +34,14 @@ describe("rota ativa", () => {
 });
 
 describe("menu", () => {
-  it("tem Controle e Clientes, nessa ordem", () => {
+  it("tem Controle, Alertas e Clientes, nessa ordem", () => {
     const itens = montarMenu().flatMap((g) => g.itens.map((i) => i.href));
-    expect(itens).toEqual(["/controle", "/clientes"]);
+    expect(itens).toEqual(["/controle", "/alertas", "/clientes"]);
+  });
+
+  it("leva o sino para Alertas, vermelho quando há atrasado", () => {
+    const alertas = montarMenu({ alertas: 5, alertasAtrasados: 2 })[0]?.itens[1];
+    expect(alertas).toMatchObject({ href: "/alertas", contagem: 5, atencao: 2 });
   });
 
   it("leva os contadores para o Controle", () => {

@@ -1,4 +1,4 @@
-# Item 2 — Alertas de prazo (para aprovação)
+# Item 2 — Alertas de prazo (entregue em 06/10: decisões 1A e 2B)
 
 **06/10/2026** · Referência: protótipo v0.7, tela `tAlertas` e o sino da barra.
 

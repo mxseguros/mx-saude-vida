@@ -24,12 +24,17 @@ export { TopoPagina };
  */
 export function Moldura({
   perfil,
+  alertas,
   children,
 }: {
   perfil: Pessoa;
+  /** O sino: atrasados + hoje. Ausente quando a contagem não carregou. */
+  alertas?: { urgentes: number; atrasados: number };
   children: React.ReactNode;
 }) {
-  const grupos = montarMenu();
+  const grupos = montarMenu(
+    alertas ? { alertas: alertas.urgentes, alertasAtrasados: alertas.atrasados } : undefined,
+  );
 
   return (
     <ProvedorMoldura valor={{ perfil, grupos }}>

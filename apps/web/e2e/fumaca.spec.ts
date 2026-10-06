@@ -20,6 +20,7 @@ const PROTEGIDAS = [
   // a tela mostra a relacao de vidas de uma empresa.
   "/controle/00000000-0000-0000-0000-000000000000/conferir",
   "/controle/00000000-0000-0000-0000-000000000000/coleta",
+  "/alertas",
   "/clientes",
   "/clientes/novo",
   "/clientes/00000000-0000-0000-0000-000000000000/funcionarios",

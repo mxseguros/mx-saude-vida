@@ -20,7 +20,7 @@ import { renovarSessao } from "@/lib/supabase/middleware";
  * no servidor. Por em ROTAS_PROTEGIDAS mandaria o gestor a um login que ele
  * nunca conseguiria usar, e o mes deixaria de ser informado sem ninguem notar.
  */
-const ROTAS_PROTEGIDAS = ["/controle", "/clientes", "/configuracoes"];
+const ROTAS_PROTEGIDAS = ["/controle", "/alertas", "/clientes", "/configuracoes"];
 
 /** Para onde vai quem entrou sem destino declarado. */
 const DESTINO_PADRAO = "/controle";

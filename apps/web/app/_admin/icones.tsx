@@ -19,6 +19,7 @@ export type NomeDoIcone =
   | "controle"
   | "lista"
   | "clientes"
+  | "alertas"
   | "ajuda"
   | "configuracoes";
 
@@ -49,6 +50,13 @@ const DESENHOS: Record<NomeDoIcone, React.ReactNode> = {
       <circle cx="7" cy="6.2" r="2.8" {...TRACO} />
       <path d="M2.4 15.1c0-2.4 2.1-4.3 4.6-4.3s4.6 1.9 4.6 4.3" {...TRACO} />
       <path d="M12.4 4.1a2.6 2.6 0 0 1 0 4.9M13.6 15.1c0-1.7-.5-2.9-1.3-3.8" {...TRACO} />
+    </>
+  ),
+  // O sino dos alertas de prazo (v0.7).
+  alertas: (
+    <>
+      <path d="M4.5 12.5V8a4.5 4.5 0 0 1 9 0v4.5l1.2 1.2H3.3z" {...TRACO} />
+      <path d="M7.4 15.2a1.7 1.7 0 0 0 3.2 0" {...TRACO} />
     </>
   ),
   // Controles deslizantes, e nao engrenagem: a engrenagem desenhada a traco
