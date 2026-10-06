@@ -2,10 +2,10 @@ import "server-only";
 
 import { clienteServidor } from "../supabase/servidor";
 import { normalizarDocumento } from "../dominio/documento";
-import { paraCanal } from "../dominio/mapear";
+import { paraCanal, paraPasso } from "../dominio/mapear";
 import type { Produto } from "../dominio/cliente";
 import type { Canal } from "../dominio/mensagem";
-import { competenciaDe } from "../dominio/controle";
+import { competenciaDe, type Passo } from "../dominio/controle";
 
 /**
  * Leitura de clientes.
@@ -279,6 +279,11 @@ export type BoletoDoCliente = {
   vencimento: string | null;
   pagaEm: string | null;
   arquivoId: string | null;
+  /** Nosso número do boleto. */
+  numero: string | null;
+  /** O último envio da mensagem de boleto ao cliente. */
+  enviadoEm: string | null;
+  enviadoPor: string | null;
 };
 
 /**
@@ -294,7 +299,7 @@ export async function listarBoletos(clienteId: string): Promise<Resultado<Boleto
 
     const { data, error } = await supabase
       .from("monthly_controls")
-      .select("id, competence, invoice_installment, invoice_amount, invoice_due, paid_at, invoice_file_id")
+      .select("id, competence, invoice_installment, invoice_amount, invoice_due, paid_at, invoice_file_id, invoice_number")
       .eq("client_id", clienteId)
       .not("invoice_attached_at", "is", null)
       .order("competence", { ascending: false })
@@ -310,7 +315,29 @@ export async function listarBoletos(clienteId: string): Promise<Resultado<Boleto
       invoice_due: string | null;
       paid_at: string | null;
       invoice_file_id: string | null;
+      invoice_number: string | null;
     }[];
+
+    // O envio ao cliente é a última mensagem de boleto que saiu de cada mês.
+    const envios = new Map<string, { em: string; por: string | null }>();
+    if (linhas.length) {
+      const { data: msgs } = await supabase
+        .from("messages")
+        .select("control_id, sent_at, profiles:sent_by(full_name)")
+        .in("control_id", linhas.map((l) => l.id))
+        .eq("kind", "invoice")
+        .not("sent_at", "is", null)
+        .order("sent_at", { ascending: false });
+      for (const m of (msgs ?? []) as unknown as {
+        control_id: string;
+        sent_at: string;
+        profiles: { full_name: string } | { full_name: string }[] | null;
+      }[]) {
+        if (envios.has(m.control_id)) continue;
+        const p = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+        envios.set(m.control_id, { em: m.sent_at, por: p?.full_name ?? null });
+      }
+    }
 
     return {
       dados: linhas.map((l) => ({
@@ -321,6 +348,9 @@ export async function listarBoletos(clienteId: string): Promise<Resultado<Boleto
         vencimento: l.invoice_due,
         pagaEm: l.paid_at,
         arquivoId: l.invoice_file_id,
+        numero: l.invoice_number,
+        enviadoEm: envios.get(l.id)?.em ?? null,
+        enviadoPor: envios.get(l.id)?.por ?? null,
       })),
       erro: null,
     };
@@ -328,3 +358,89 @@ export async function listarBoletos(clienteId: string): Promise<Resultado<Boleto
     return { dados: [], erro: "Não foi possível falar com o banco de dados." };
   }
 }
+
+export type OrigemDaMovimentacao = "link" | "equipe" | "sem_movimentacao" | "planilha" | "aguardando";
+
+export type MovimentacaoDoMes = {
+  controleId: string;
+  competencia: string;
+  passo: Passo;
+  origem: OrigemDaMovimentacao;
+  entradas: number;
+  saidas: number;
+  conferidaPor: string | null;
+  conferidaEm: string | null;
+  planilhaId: string | null;
+};
+
+/** Os meses do cliente, do mais recente para o mais antigo (aba Movimentações). */
+export async function listarMovimentacoes(clienteId: string): Promise<Resultado<MovimentacaoDoMes[]>> {
+  try {
+    const supabase = await clienteServidor();
+    const { data, error } = await supabase
+      .from("monthly_controls")
+      .select("id, competence, step, no_changes, received_at, spreadsheet_file_id, checked_at, profiles:checked_by(full_name)")
+      .eq("client_id", clienteId)
+      .order("competence", { ascending: false })
+      .limit(36);
+    if (error) return { dados: [], erro: "Não foi possível carregar as movimentações." };
+
+    const meses = (data ?? []) as unknown as {
+      id: string;
+      competence: string;
+      step: string;
+      no_changes: boolean;
+      received_at: string | null;
+      spreadsheet_file_id: string | null;
+      checked_at: string | null;
+      profiles: { full_name: string } | { full_name: string }[] | null;
+    }[];
+
+    const contagem = new Map<string, { entradas: number; saidas: number; gestor: boolean; equipe: boolean }>();
+    if (meses.length) {
+      const { data: pessoas } = await supabase
+        .from("movements")
+        .select("control_id, kind, source")
+        .in("control_id", meses.map((m) => m.id));
+      for (const p of (pessoas ?? []) as { control_id: string; kind: string; source: string }[]) {
+        const c = contagem.get(p.control_id) ?? { entradas: 0, saidas: 0, gestor: false, equipe: false };
+        if (p.kind === "exit") c.saidas += 1;
+        else c.entradas += 1;
+        if (p.source === "manager") c.gestor = true;
+        else c.equipe = true;
+        contagem.set(p.control_id, c);
+      }
+    }
+
+    return {
+      dados: meses.map((m) => {
+        const c = contagem.get(m.id);
+        const origem: OrigemDaMovimentacao = m.no_changes
+          ? "sem_movimentacao"
+          : c?.gestor
+            ? "link"
+            : c?.equipe
+              ? "equipe"
+              : m.spreadsheet_file_id
+                ? "planilha"
+                : "aguardando";
+        const quem = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+        return {
+          controleId: m.id,
+          competencia: competenciaDe(m.competence),
+          passo: paraPasso(m.step),
+          origem,
+          entradas: c?.entradas ?? 0,
+          saidas: c?.saidas ?? 0,
+          conferidaPor: quem?.full_name ?? null,
+          conferidaEm: m.checked_at,
+          planilhaId: m.spreadsheet_file_id,
+        };
+      }),
+      erro: null,
+    };
+  } catch {
+    return { dados: [], erro: "Não foi possível falar com o banco de dados." };
+  }
+}
+
