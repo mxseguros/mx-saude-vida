@@ -7,6 +7,8 @@ import {
   type Passo,
 } from "@/lib/dominio/controle";
 import { ROTULO_MODELO } from "@/lib/dominio/mensagem";
+import Link from "next/link";
+
 import { nomeCurto } from "@/lib/dominio/cliente";
 import type { LinhaDoControle } from "@/lib/controles/consulta";
 
@@ -77,9 +79,13 @@ export function Etiqueta({ passo }: { passo: Passo }) {
 
 export function Nome({ linha }: { linha: LinhaDoControle }) {
   return (
-    <span className="font-[600] text-heading" title={linha.observacoes ?? undefined}>
+    <Link
+      href={`/clientes/${linha.clienteId}`}
+      className="font-[600] text-heading underline-offset-2 hover:underline"
+      title={linha.observacoes ?? "Abrir o cadastro do cliente"}
+    >
       {nomeCurto({ razaoSocial: linha.razaoSocial, nomeFantasia: linha.nomeFantasia })}
-    </span>
+    </Link>
   );
 }
 

@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 
 import { TopoPagina } from "@/app/_admin/moldura";
-import { listarControles, listarModelos } from "@/lib/controles/consulta";
+import { listarControles, listarModelos, type LinhaDoControle } from "@/lib/controles/consulta";
+import { casaBusca, ordemAlfabetica } from "@/lib/dominio/busca";
 import { CHAVES_DE_DATA, contarPrazos, ROTULO_DATA, rotuloDaCompetencia } from "@/lib/dominio/controle";
 import { competenciaDeHoje, hojeSaoPaulo } from "@/lib/dominio/hoje";
 import { ROTULO_CANAL } from "@/lib/dominio/mensagem";
@@ -30,9 +31,10 @@ export const metadata: Metadata = { title: "Controle mensal" };
 export default async function PaginaControle({
   searchParams,
 }: {
-  searchParams: Promise<{ mes?: string; vista?: string; dia?: string }>;
+  searchParams: Promise<{ mes?: string; vista?: string; dia?: string; q?: string }>;
 }) {
-  const { mes, vista, dia } = await searchParams;
+  const { mes, vista, dia, q } = await searchParams;
+  const busca = (q ?? "").slice(0, 80).trim();
   const competencia = /^\d{4}-\d{2}$/.test(mes ?? "") ? (mes as string) : competenciaDeHoje();
   const hoje = hojeSaoPaulo();
 
@@ -42,12 +44,17 @@ export default async function PaginaControle({
   const diaEscolhido = /^\d{4}-\d{2}-\d{2}$/.test(dia ?? "") ? (dia as string) : null;
 
   const [controle, modelos] = await Promise.all([listarControles(competencia), listarModelos()]);
+  // Os contadores são do mês inteiro; a busca só filtra o que aparece.
   const contagem = contarPrazos(controle.dados, hoje);
+  const nomeDe = (l: LinhaDoControle) => nomeCurto({ razaoSocial: l.razaoSocial, nomeFantasia: l.nomeFantasia });
+  const linhas = ordemAlfabetica(controle.dados, nomeDe).filter((l) =>
+    casaBusca(busca, { nomes: [nomeDe(l), l.razaoSocial], documento: l.documento }),
+  );
 
   // A agenda é derivada das MESMAS linhas da Lista — nenhuma consulta a mais, e
   // nenhum lugar onde os dois possam discordar sobre o estado de um mês.
   const agenda = montarAgenda(
-    controle.dados.map(
+    linhas.map(
       (linha): MesParaAgenda => ({
         id: linha.id,
         cliente: nomeCurto({ razaoSocial: linha.razaoSocial, nomeFantasia: linha.nomeFantasia }),
@@ -73,10 +80,16 @@ export default async function PaginaControle({
     <>
       <TopoPagina
         titulo={`Controle de ${rotuloDaCompetencia(competencia).toLowerCase()}`}
-        contagem={controle.dados.length ? `${controle.dados.length} segurados` : undefined}
+        contagem={
+          controle.dados.length
+            ? busca
+              ? `${linhas.length} de ${controle.dados.length} segurados`
+              : `${controle.dados.length} segurados`
+            : undefined
+        }
         acoes={
           <span className="flex flex-wrap items-center gap-2.5">
-            <SeletorDeVista competencia={competencia} atual={atual} />
+            <SeletorDeVista competencia={competencia} atual={atual} busca={busca} />
             <AbrirMes competencia={competencia} />
           </span>
         }
@@ -126,6 +139,41 @@ export default async function PaginaControle({
                 </span>
               </div>
             </div>
+
+            {/* Busca pela URL (`?q=`): funciona sem JavaScript, vale para as três
+                vistas, e o link com a busca pode ser mandado para outra pessoa. */}
+            <form action="/controle" method="get" role="search" className="flex flex-wrap items-center gap-2.5">
+              <input type="hidden" name="mes" value={competencia} />
+              <input type="hidden" name="vista" value={atual} />
+              <label className="sr-only" htmlFor="busca-controle">
+                Buscar segurado ou CNPJ
+              </label>
+              <input
+                id="busca-controle"
+                name="q"
+                type="search"
+                defaultValue={busca}
+                placeholder="Buscar segurado ou CNPJ"
+                className="h-[42px] w-full max-w-[360px] rounded-[6px] border border-line-strong bg-surface px-3 text-[16px] text-texto placeholder:text-faint sm:text-[14px]"
+              />
+              <button
+                type="submit"
+                className="h-[42px] rounded-[6px] bg-brand px-4 text-[14px] font-[600] text-on-brand hover:bg-brand-hover"
+              >
+                Buscar
+              </button>
+              {busca ? (
+                <a href={`/controle?mes=${competencia}&vista=${atual}`} className="text-[13px] font-[600] text-muted underline underline-offset-2">
+                  Limpar busca
+                </a>
+              ) : null}
+            </form>
+
+            {busca && linhas.length === 0 ? (
+              <p className="rounded-[10px] border border-line bg-surface p-4 text-[13.5px] text-muted">
+                Nenhum segurado com “{busca}” neste mês.
+              </p>
+            ) : null}
 
             {/* Mês e Semana: os mesmos dados virados de lado — uma atividade
                 por data, em vez de uma linha por cliente com quatro datas. */}
@@ -178,7 +226,7 @@ export default async function PaginaControle({
                   </tr>
                 </thead>
                 <tbody>
-                  {controle.dados.map((linha) => (
+                  {linhas.map((linha) => (
                     <tr key={linha.id} className="border-b border-line align-middle last:border-0 hover:bg-surface-2">
                       <td className="px-2.5 py-2.5">
                         <Nome linha={linha} />
@@ -206,7 +254,7 @@ export default async function PaginaControle({
 
             {/* Celular: cartão, com as mesmas quatro datas em linha. */}
             <ul className="flex list-none flex-col gap-2 lg:hidden">
-              {controle.dados.map((linha) => (
+              {linhas.map((linha) => (
                 <li key={linha.id} className="flex flex-col gap-2 rounded-[10px] border border-line bg-surface p-3.5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <Nome linha={linha} />

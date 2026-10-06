@@ -18,7 +18,7 @@ const VISTAS: { id: Vista; rotulo: string }[] = [
   { id: "semana", rotulo: "Semana" },
 ];
 
-export function SeletorDeVista({ competencia, atual }: { competencia: string; atual: Vista }) {
+export function SeletorDeVista({ competencia, atual, busca = "" }: { competencia: string; atual: Vista; busca?: string }) {
   return (
     <div
       role="group"
@@ -30,7 +30,7 @@ export function SeletorDeVista({ competencia, atual }: { competencia: string; at
         return (
           <Link
             key={vista.id}
-            href={`/controle?mes=${competencia}&vista=${vista.id}`}
+            href={`/controle?mes=${competencia}&vista=${vista.id}${busca ? `&q=${encodeURIComponent(busca)}` : ""}`}
             scroll={false}
             aria-current={ativa ? "true" : undefined}
             className={
