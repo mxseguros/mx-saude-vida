@@ -110,7 +110,7 @@ export default async function PaginaControle({
 
               <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-[8px] border border-line px-3 py-2 text-[12px] text-muted">
                 <span className="font-(family-name:--font-display) text-[11px] font-[700] uppercase tracking-[.06em] text-faint">
-                  Datas
+                  Legenda Datas
                 </span>
                 <span>
                   <b className="tabular mr-1 font-[700] text-bad">10/09</b> vencida ou hoje
