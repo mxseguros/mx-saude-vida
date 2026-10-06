@@ -127,6 +127,22 @@ test.describe("coleta pela equipe", () => {
   });
 });
 
+/** Ler a apólice custa dinheiro e salvar grava contrato: as duas exigem sessão. */
+test.describe("apólice do cliente", () => {
+  const CLIENTE = "00000000-0000-0000-0000-000000000000";
+  const pdf = { name: "a.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4") };
+
+  test("ler o PDF exige sessão", async ({ request }) => {
+    const resposta = await request.post(`/api/v1/clientes/${CLIENTE}/apolice/leitura`, { multipart: { arquivo: pdf } });
+    expect([401, 503]).toContain(resposta.status());
+  });
+
+  test("salvar a apólice exige sessão", async ({ request }) => {
+    const resposta = await request.put(`/api/v1/clientes/${CLIENTE}/apolice`, { multipart: { dados: "{}" } });
+    expect([401, 503]).toContain(resposta.status());
+  });
+});
+
 test.describe("anexar boleto", () => {
   const MES = "00000000-0000-0000-0000-000000000000";
 

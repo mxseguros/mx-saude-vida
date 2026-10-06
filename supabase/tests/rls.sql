@@ -177,6 +177,21 @@ select pg_temp.exigir((select count(*) from movements) = 3, 'analista ativa nao 
 insert into movements (control_id, kind, full_name, document, source)
 values ('c0000000-0000-0000-0000-00000000000a', 'entry', 'Digitado Pela Analista', '99999999903', 'staff');
 
+-- A analista registra a propria execucao da IA, e so a propria: o teto diario
+-- e por pessoa, e assinar por outra burlaria o limite.
+insert into ai_runs (agent, model, profile_id, cost_brl)
+values ('apolice', 'teste', '11111111-1111-1111-1111-111111111111', 0.10);
+select pg_temp.exigir(gasto_ia_do_dia('11111111-1111-1111-1111-111111111111') >= 0.10, 'gasto do dia nao somou');
+select pg_temp.exigir_recusa(
+  $$insert into ai_runs (agent, model, profile_id) values ('apolice', 'teste', '22222222-2222-2222-2222-222222222222')$$,
+  'analista registrou execucao em nome de outra pessoa'
+);
+-- Depois de gravada, so o aceite muda: saida e custo sao livro-caixa.
+select pg_temp.exigir_recusa(
+  $$update ai_runs set cost_brl = 0 where profile_id = '11111111-1111-1111-1111-111111111111'$$,
+  'analista reescreveu o custo da IA'
+);
+
 -- Reenvio do gestor refaz o que ELE informou: as linhas de `manager` saem e as
 -- novas entram. O que o gestor mandou antes fica na linha do tempo, que e
 -- append-only — e por isso que apagar aqui nao perde a historia.
@@ -272,6 +287,11 @@ select pg_temp.exigir_recusa(
   $$insert into movements (control_id, kind, full_name, source)
     values ('c0000000-0000-0000-0000-00000000000a', 'entry', 'Pessoa Da Leitura', 'staff')$$,
   'perfil de leitura digitou movimentacao'
+);
+
+select pg_temp.exigir_recusa(
+  $$insert into ai_runs (agent, model, profile_id) values ('apolice', 'teste', '44444444-4444-4444-4444-444444444444')$$,
+  'perfil de leitura gastou com IA'
 );
 
 -- Gerar link e ESCRITA: o token e a credencial de quem vai informar as vidas da

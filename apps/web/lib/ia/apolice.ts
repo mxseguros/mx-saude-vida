@@ -77,27 +77,8 @@ export async function primeirasPaginas(pdf: Buffer, quantas = PAGINAS_LIDAS): Pr
    O esquema
    -------------------------------------------------------------------------- */
 
-const faixa = z.object({
-  /** "Funcionário", "Sócio", "Morte", "Morte Acidental". */
-  rotulo: z.string(),
-  capital: z.number().nonnegative(),
-});
-
-/**
- * As quatro formas de capital que as apólices reais usam.
- *
- * `nao_consta` existe para o modelo poder dizer que não achou, em vez de
- * escolher a forma menos errada e inventar um número.
- */
-export const esquemaCapital = z.discriminatedUnion("tipo", [
-  z.object({ tipo: z.literal("por_cargo"), faixas: z.array(faixa).min(1) }),
-  z.object({ tipo: z.literal("por_cobertura"), faixas: z.array(faixa).min(1) }),
-  z.object({ tipo: z.literal("per_capita"), valor: z.number().nonnegative() }),
-  z.object({ tipo: z.literal("multiplo_salarial"), multiplo: z.number().positive() }),
-  z.object({ tipo: z.literal("nao_consta") }),
-]);
-
-export type Capital = z.infer<typeof esquemaCapital>;
+export { esquemaCapital, type Capital } from "../dominio/apolice";
+import { esquemaCapital } from "../dominio/apolice";
 
 export const esquemaApolice = z.object({
   numeroApolice: z.string().nullable(),

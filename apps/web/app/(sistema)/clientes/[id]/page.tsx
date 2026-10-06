@@ -4,20 +4,30 @@ import { notFound } from "next/navigation";
 import { TopoPagina } from "@/app/_admin/moldura";
 import { lerCliente, listarAcervo, listarBoletos, listarSeguradoras } from "@/lib/clientes/consulta";
 import { nomeCurto } from "@/lib/dominio/cliente";
+import { lerApoliceAtiva } from "@/lib/clientes/apolice";
+import { apoliceParaFormulario } from "@/lib/dominio/apolice";
+import { situacaoDaLeitura } from "@/lib/ia/registro";
+import { perfilAtual } from "@/lib/supabase/servidor";
 
 import { FormularioCliente } from "../formulario";
 import { Acervo } from "./acervo";
+import { BlocoDaApolice } from "./apolice";
 
 export const metadata: Metadata = { title: "Cliente" };
 
 export default async function PaginaCliente({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [cliente, seguradoras, boletos, documentos] = await Promise.all([
+  const [cliente, seguradoras, boletos, documentos, apolice, eu] = await Promise.all([
     lerCliente(id),
     listarSeguradoras(),
     listarBoletos(id),
     listarAcervo(id),
+    lerApoliceAtiva(id),
+    perfilAtual(),
   ]);
+  const situacao = eu
+    ? await situacaoDaLeitura(eu.id)
+    : { disponivel: false, motivo: "sem_chave" as const };
 
   // Erro de banco e cliente inexistente merecem telas diferentes: mandar os
   // dois para o 404 esconde instabilidade atras de "nao encontrado".
@@ -47,9 +57,13 @@ export default async function PaginaCliente({ params }: { params: Promise<{ id: 
         <div className="mx-auto flex max-w-[840px] flex-col gap-4">
           <FormularioCliente cliente={cliente.dados} seguradoras={seguradoras.dados} />
 
-          {/* Depois do formulário de propósito: o acesso ao portal é consequência
-              do cadastro, e quem abre esta tela quase sempre vem conferir ou
-              corrigir um campo, não dar acesso. */}
+          <BlocoDaApolice
+            clienteId={id}
+            inicial={apolice ? apoliceParaFormulario(apolice) : null}
+            pdfNome={apolice?.pdfNome ?? null}
+            situacao={situacao}
+          />
+
           {/* Por último: é consulta, não cadastro. Quem abre esta tela vem
               corrigir um campo; o acervo é para quando o cliente ligou. */}
           <Acervo boletos={boletos.dados} documentos={documentos.dados} />

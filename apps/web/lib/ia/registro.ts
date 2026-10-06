@@ -1,5 +1,7 @@
 import "server-only";
 
+import { registrarLog } from "../log";
+
 import { clienteServidor } from "../supabase/servidor";
 import {
   cacheAindaVale,
@@ -55,7 +57,7 @@ export async function registrar(execucao: Execucao): Promise<number | null> {
   try {
     const supabase = await clienteServidor();
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("ai_runs")
       .insert({
         client_id: execucao.clienteId,
@@ -64,15 +66,18 @@ export async function registrar(execucao: Execucao): Promise<number | null> {
         input_summary: execucao.entradaResumo.slice(0, 500),
         output: execucao.saida,
         model: execucao.modelo,
-        tokens: execucao.uso.entrada + execucao.uso.saida,
+        input_tokens: execucao.uso.entrada,
+        output_tokens: execucao.uso.saida,
         cost_brl: custoEmReal(execucao.modelo, execucao.uso, cotacao()),
         accepted: null,
-        created_by: execucao.pessoaId ?? null,
-        input_hash: execucao.hash ?? null,
+        profile_id: execucao.pessoaId ?? null,
+        content_hash: execucao.hash ?? null,
       })
       .select("id")
       .single();
 
+    // Ficou meses falhando calado por coluna errada: agora deixa rastro.
+    if (error) registrarLog("erro", "ia.registro", { codigo: error.code });
     return (data?.id as number) ?? null;
   } catch {
     return null;
@@ -124,7 +129,7 @@ export async function promptAtivo(
     const supabase = cliente ?? (await clienteServidor());
     const { data } = await supabase
       .from("ai_prompts")
-      .select("id, prompt")
+      .select("id, body")
       .eq("agent", agente)
       .eq("active", true)
       .order("version", { ascending: false })
@@ -132,7 +137,7 @@ export async function promptAtivo(
       .maybeSingle();
 
     if (!data) return { id: null, texto: padrao };
-    return { id: data.id as number, texto: data.prompt as string };
+    return { id: data.id as number, texto: data.body as string };
   } catch {
     return { id: null, texto: padrao };
   }
@@ -216,7 +221,7 @@ export async function extracaoNoCache(
       .from("ai_runs")
       .select("output, created_at")
       .eq("agent", agente)
-      .eq("input_hash", hash)
+      .eq("content_hash", hash)
       .not("output", "is", null)
       .order("created_at", { ascending: false })
       .limit(1)

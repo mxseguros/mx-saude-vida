@@ -1,6 +1,67 @@
 import "server-only";
 
+import { enviarArquivo } from "../arquivos/servico";
+import { capitalDoCadastro, type ApoliceValidada } from "../dominio/apolice";
+import { marcarAceite } from "../ia/registro";
 import { clienteServidor } from "../supabase/servidor";
+import type { ResultadoEscrita } from "./servico";
+
+/**
+ * Grava a apólice que a analista conferiu. A IA nunca salva: chega aqui só o
+ * que passou pela tela.
+ *
+ * Uma apólice ativa por cliente: existindo, é atualizada (renovação troca
+ * número e vigência, não cria um segundo contrato vigente).
+ */
+export async function salvarApolice(
+  clienteId: string,
+  dados: ApoliceValidada,
+  arquivo: File | null,
+  perfilId: string,
+): Promise<ResultadoEscrita<{ id: string }>> {
+  try {
+    let pdfId: string | null = null;
+    if (arquivo) {
+      const enviado = await enviarArquivo(
+        { clienteId, controleId: null, competencia: null, tipo: "apolice", arquivo },
+        { perfilId },
+      );
+      if (!enviado.ok) return enviado;
+      pdfId = enviado.dados.id;
+    }
+
+    const supabase = await clienteServidor();
+    const ficha: Record<string, unknown> = {
+      policy_number: dados.numero,
+      contract_number: dados.contrato,
+      product_name: dados.produto,
+      valid_from: dados.vigenciaInicio,
+      valid_to: dados.vigenciaFim,
+      capital_rule: capitalDoCadastro(dados),
+      rate_per_mille: dados.taxaPorMil,
+      age_limit: dados.limiteDeIdade,
+    };
+    if (pdfId) ficha.pdf_file_id = pdfId;
+    if (dados.execucaoId) ficha.extracted_by_ai_run = dados.execucaoId;
+
+    const atual = await lerApoliceAtiva(clienteId);
+    const { data, error } = atual
+      ? await supabase.from("policies").update(ficha).eq("id", atual.id).select("id").single()
+      : await supabase.from("policies").insert({ ...ficha, client_id: clienteId }).select("id").single();
+
+    if (error || !data) {
+      return {
+        ok: false,
+        falha: { status: 503, codigo: "apolice_nao_salva", mensagem: "Não foi possível salvar a apólice." },
+      };
+    }
+
+    if (dados.execucaoId) await marcarAceite(dados.execucaoId, true);
+    return { ok: true, dados: { id: (data as { id: string }).id } };
+  } catch {
+    return { ok: false, falha: { status: 503, codigo: "sem_banco", mensagem: "Não foi possível falar com o servidor." } };
+  }
+}
 
 export type ApoliceDoCliente = {
   id: string;
