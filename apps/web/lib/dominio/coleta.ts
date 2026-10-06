@@ -356,3 +356,15 @@ export function roboDePrevia(userAgent: string | null): boolean {
     userAgent ?? "",
   );
 }
+
+/**
+ * Versão do cartão do WhatsApp. O WhatsApp guarda a prévia de cada endereço na
+ * primeira vez que o vê; trocar a versão faz um link já existente ganhar a
+ * prévia nova. Suba o número quando mudar a imagem ou o texto do cartão.
+ */
+export const VERSAO_DO_CARTAO = "2";
+
+/** O link como vai na mensagem: o mesmo endereço, com a versão do cartão. */
+export function linkComCartao(url: string): string {
+  return `${url}${url.includes("?") ? "&" : "?"}v=${VERSAO_DO_CARTAO}`;
+}

@@ -8,6 +8,7 @@ import {
   diasParaFechar,
   estadoDoLink,
   pareceToken,
+  linkComCartao,
   roboDePrevia,
   esquemaColeta,
   movimentosDaColeta,
@@ -379,5 +380,12 @@ describe("robô de prévia não conta como abertura", () => {
   it("celular de gente é abertura", () => {
     expect(roboDePrevia("Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 Chrome/128 Mobile Safari/537.36")).toBe(false);
     expect(roboDePrevia(null)).toBe(false);
+  });
+});
+
+describe("link com a versão do cartão", () => {
+  it("acrescenta a versão sem mexer no token", () => {
+    expect(linkComCartao("https://exemplo.test/coleta/abc")).toBe("https://exemplo.test/coleta/abc?v=2");
+    expect(linkComCartao("https://exemplo.test/coleta/abc?x=1")).toBe("https://exemplo.test/coleta/abc?x=1&v=2");
   });
 });

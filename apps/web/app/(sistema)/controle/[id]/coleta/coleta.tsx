@@ -7,7 +7,7 @@ import { Botao } from "@/componentes/ui/botao";
 import { Campo } from "@/componentes/ui/campo";
 import { useAviso } from "@/componentes/ui/aviso";
 import type { LinhaDoControle } from "@/lib/controles/consulta";
-import { estadoDoLink } from "@/lib/dominio/coleta";
+import { estadoDoLink, linkComCartao } from "@/lib/dominio/coleta";
 import { nomeDoMes } from "@/lib/dominio/controle";
 import { formatarData } from "@/lib/dominio/email";
 import { linkWhatsapp } from "@/lib/dominio/mensagem";
@@ -84,7 +84,7 @@ export function Coleta({
         url = json?.data?.url as string;
       }
 
-      const destino = linkWhatsapp(celular, textoDoConvite(cliente, linha, url));
+      const destino = linkWhatsapp(celular, textoDoConvite(cliente, linha, linkComCartao(url)));
       if (destino) {
         const janela = window.open(destino, "_blank");
         if (janela) janela.opener = null;
