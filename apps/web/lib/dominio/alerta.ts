@@ -22,7 +22,8 @@ export type Alerta = {
   controleId: string;
   titulo: string;
   detalhe: string;
-  acao: { rotulo: string; href: string };
+  /** `confirmar`: o botão grava na hora, sem trocar de tela. */
+  acao: { rotulo: string; href: string; confirmar?: string };
   /** Para ordenar: o dia do prazo, ou vazio no grupo "para validar". */
   dia: string;
 };
@@ -36,6 +37,7 @@ export type MesParaAlerta = MesParaAgenda & {
 const NOME: Record<TipoDeAtividade, string> = {
   informar: "Compartilhar o link",
   corte: "Corte",
+  confirmar: "Confirmar emissão",
   boleto: "Gerar o boleto",
   vencimento: "Vencimento do boleto",
 };
@@ -51,6 +53,7 @@ function diasEntre(de: string, ate: string): number {
 
 /** O botão que resolve, levando à tela certa. */
 function acaoDe(a: Atividade, competencia: string): Alerta["acao"] {
+  if (a.tipo === "confirmar") return { rotulo: "Confirmar", href: `/controle?mes=${competencia}`, confirmar: a.controleId };
   if (a.passo === "planilha_recebida") return { rotulo: "Conferir", href: `/controle/${a.controleId}/conferir` };
   if (a.tipo === "informar" || (a.tipo === "corte" && a.passo === "informar")) {
     return { rotulo: "Enviar link", href: `/controle/${a.controleId}/coleta` };

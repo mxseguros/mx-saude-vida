@@ -13,7 +13,7 @@ import {
   TIPOS_DE_ATIVIDADE,
   type MesParaAgenda,
 } from "../lib/dominio/atividade";
-import { PASSOS, type DatasDoMes } from "../lib/dominio/controle";
+import { datasDaCompetencia, PASSOS, type DatasDoMes } from "../lib/dominio/controle";
 
 /**
  * As atividades que alimentam as vistas Mês e Semana.
@@ -259,8 +259,44 @@ describe("o calendário", () => {
   });
 });
 
-describe("os tipos são os quatro, e só", () => {
+describe("os tipos são os cinco do v0.7, e só", () => {
   it("nenhum tipo sem rótulo", () => {
-    expect(TIPOS_DE_ATIVIDADE).toHaveLength(4);
+    expect(TIPOS_DE_ATIVIDADE).toEqual(["informar", "corte", "confirmar", "boleto", "vencimento"]);
+  });
+});
+
+describe("confirmar emissão (5ª data)", () => {
+  const regras = { informarDia: 20, corteDia: 25, confirmarDia: 26, boletoDia: 26, vencimentoDia: 20 };
+  const datas = datasDaCompetencia("2026-09", regras)!;
+  const mes = (troca: Partial<MesParaAgenda> = {}): MesParaAgenda => ({
+    id: "m1",
+    cliente: "Cliente A",
+    seguradora: null,
+    analista: null,
+    passo: "corte",
+    datas,
+    acompanhaPagamento: true,
+    ...troca,
+  });
+  const confirmar = (m: MesParaAgenda, hoje: string) => atividadesDoMes(m, hoje).find((a) => a.tipo === "confirmar");
+
+  it("a data cai entre o corte e o boleto, e vira o mês quando o dia é menor", () => {
+    expect(datas.confirmar).toBe("2026-09-26");
+    expect(datasDaCompetencia("2026-09", { ...regras, confirmarDia: 2, boletoDia: 5 })?.confirmar).toBe("2026-10-02");
+  });
+
+  it("sem o dia nas regras, a atividade não existe", () => {
+    const sem = datasDaCompetencia("2026-09", { ...regras, confirmarDia: null })!;
+    expect("confirmar" in sem).toBe(false);
+    expect(confirmar(mes({ datas: sem }), "2026-09-27")).toBeUndefined();
+  });
+
+  it("passou o dia sem confirmar, atrasada; confirmada, feita", () => {
+    expect(confirmar(mes(), "2026-09-27")?.estado).toBe("atrasada");
+    expect(confirmar(mes({ emissaoConfirmada: true }), "2026-09-27")?.estado).toBe("feita");
+  });
+
+  it("boleto anexado também cumpre", () => {
+    expect(confirmar(mes({ passo: "boleto" }), "2026-09-27")?.estado).toBe("feita");
   });
 });

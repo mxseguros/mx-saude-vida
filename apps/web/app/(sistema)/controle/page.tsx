@@ -56,6 +56,7 @@ export default async function PaginaControle({
         passo: linha.passo,
         datas: linha.datas,
         acompanhaPagamento: linha.acompanhaPagamento,
+        emissaoConfirmada: linha.emissaoConfirmadaEm !== null,
       }),
     ),
     hoje,

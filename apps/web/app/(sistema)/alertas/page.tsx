@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { TopoPagina } from "@/app/_admin/moldura";
+import { ConfirmarEmissao } from "@/componentes/confirmar-emissao";
 import { LinkBotao } from "@/componentes/ui/botao";
 import { lerAlertas } from "@/lib/alertas/consulta";
 import { ROTULO_GRUPO, type GrupoDeAlerta } from "@/lib/dominio/alerta";
@@ -65,9 +66,13 @@ export default async function PaginaAlertas() {
                         </b>
                         <span className="text-[12.5px] text-muted">{a.detalhe}</span>
                       </div>
-                      <LinkBotao href={a.acao.href} variante={urgente ? "primario" : "secundario"}>
-                        {a.acao.rotulo}
-                      </LinkBotao>
+                      {a.acao.confirmar ? (
+                        <ConfirmarEmissao controleId={a.acao.confirmar} variante={urgente ? "primario" : "secundario"} />
+                      ) : (
+                        <LinkBotao href={a.acao.href} variante={urgente ? "primario" : "secundario"}>
+                          {a.acao.rotulo}
+                        </LinkBotao>
+                      )}
                     </li>
                   ))}
                 </ul>

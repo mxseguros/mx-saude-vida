@@ -167,6 +167,11 @@ test.describe("funcionários", () => {
   });
 });
 
+test("confirmar emissão exige sessão", async ({ request }) => {
+  const r = await request.post("/api/v1/controles/00000000-0000-0000-0000-000000000000/emissao");
+  expect([401, 503]).toContain(r.status());
+});
+
 test.describe("anexar boleto", () => {
   const MES = "00000000-0000-0000-0000-000000000000";
 

@@ -89,7 +89,9 @@ insert into control_events (control_id, type, origin, actor_profile_id, note)
 values
   ('c0000000-0000-0000-0000-00000000000a', 'link_sent', 'staff',
    '11111111-1111-1111-1111-111111111111', 'Link enviado no teste.'),
-  ('c0000000-0000-0000-0000-00000000000a', 'link_opened', 'client', null, 'Link aberto no teste.');
+  ('c0000000-0000-0000-0000-00000000000a', 'link_opened', 'client', null, 'Link aberto no teste.'),
+  ('c0000000-0000-0000-0000-00000000000a', 'issue_confirmed', 'staff',
+   '11111111-1111-1111-1111-111111111111', 'Emissao confirmada no teste.');
 
 insert into messages (control_id, kind, channel, to_address, body, status)
 values

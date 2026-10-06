@@ -58,6 +58,8 @@ export const ROTULO_PASSO: Record<Passo, string> = {
 export type RegrasDoMes = {
   informarDia: number | null;
   corteDia: number | null;
+  /** Confirmar emissão (v0.7): opcional; em branco, o cliente não tem a etapa. */
+  confirmarDia?: number | null;
   boletoDia: number;
   vencimentoDia: number;
 };
@@ -66,6 +68,8 @@ export type RegrasDoMes = {
 export type DatasDoMes = {
   informar: string | null;
   corte: string | null;
+  /** Só existe para quem tem "Confirmar emissão" nas Regras do mês. */
+  confirmar?: string | null;
   boleto: string;
   vencimento: string;
 };
@@ -78,6 +82,7 @@ export const CHAVES_DE_DATA: readonly ChaveDeData[] = ["informar", "corte", "bol
 export const ROTULO_DATA: Record<ChaveDeData, string> = {
   informar: "Informar até",
   corte: "Corte",
+  confirmar: "Confirmar emissão",
   boleto: "Boleto",
   vencimento: "Vencimento",
 };
@@ -135,10 +140,11 @@ export function datasDaCompetencia(competencia: string, regras: RegrasDoMes): Da
 
   const informar = proxima(regras.informarDia);
   const corte = proxima(regras.corteDia);
+  const confirmar = proxima(regras.confirmarDia ?? null);
   const boleto = proxima(regras.boletoDia) as string;
   const vencimento = proxima(regras.vencimentoDia) as string;
 
-  return { informar, corte, boleto, vencimento };
+  return { informar, corte, ...(confirmar ? { confirmar } : {}), boleto, vencimento };
 }
 
 /** O passo em que o mês de um cliente nasce. */
@@ -207,7 +213,7 @@ export function aparenciaDaData(
   hoje: string,
 ): AparenciaDaData {
   const data = datas[chave];
-  if (data === null) return "sem_data";
+  if (data === null || data === undefined) return "sem_data";
 
   const foco = dataEmFoco(passo);
   if (foco === null) return "cumprida";

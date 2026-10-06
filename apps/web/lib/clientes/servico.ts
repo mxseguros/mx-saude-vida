@@ -36,6 +36,7 @@ function paraLinha(dados: DadosDoCliente) {
     notes: dados.observacoes,
     inform_day: dados.informarDia,
     cutoff_day: dados.corteDia,
+    confirm_day: dados.confirmarDia,
     invoice_day: dados.boletoDia,
     due_day: dados.vencimentoDia,
     mx_tracks_payment: dados.acompanhaPagamento,

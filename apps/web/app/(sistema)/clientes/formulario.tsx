@@ -36,6 +36,7 @@ function valoresIniciais(cliente?: ClienteCompleto | null): Valores {
     observacoes: cliente?.observacoes ?? "",
     informarDia: cliente?.informarDia ? String(cliente.informarDia) : "",
     corteDia: cliente?.corteDia ? String(cliente.corteDia) : "",
+    confirmarDia: cliente?.confirmarDia ? String(cliente.confirmarDia) : "",
     boletoDia: cliente?.boletoDia ? String(cliente.boletoDia) : "",
     vencimentoDia: cliente?.vencimentoDia ? String(cliente.vencimentoDia) : "",
     // `"1"` e nao `true`: o estado do formulario e um mapa de strings, e ele
@@ -189,7 +190,7 @@ export function FormularioCliente({
           </p>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <Campo
             rotulo="Informar até"
             inputMode="numeric"
@@ -209,6 +210,16 @@ export function FormularioCliente({
             onChange={(e) => definir("corteDia", e.target.value.replace(/\D/g, ""))}
             erro={erros.corteDia}
             dica="Último dia para movimentar."
+          />
+          <Campo
+            rotulo="Confirmar emissão"
+            inputMode="numeric"
+            maxLength={2}
+            placeholder="dia"
+            value={valores.confirmarDia}
+            onChange={(e) => definir("confirmarDia", e.target.value.replace(/\D/g, ""))}
+            erro={erros.confirmarDia}
+            dica="Só se a seguradora pede. Pode ficar em branco."
           />
           <Campo
             rotulo="Emissão do boleto"

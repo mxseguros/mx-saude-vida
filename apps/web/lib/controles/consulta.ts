@@ -50,6 +50,9 @@ export type LinhaDoControle = {
 
   ultimaMensagem: { modelo: ModeloDeMensagem; canal: "email" | "whatsapp"; em: string } | null;
 
+  /** Quando a analista confirmou a emissão. Nulo = ainda não, ou o cliente não tem a etapa. */
+  emissaoConfirmadaEm: string | null;
+
   /** A coleta por link deste mês. */
   coleta: Coleta;
 };
@@ -137,6 +140,8 @@ type LinhaDaView = {
   staff_entries: number | null;
   staff_exits: number | null;
   resent_after_check: boolean | null;
+  confirm_date: string | null;
+  issue_confirmed_at: string | null;
 };
 
 function paraLinha(v: LinhaDaView): LinhaDoControle {
@@ -149,6 +154,7 @@ function paraLinha(v: LinhaDaView): LinhaDoControle {
     datas: {
       informar: v.inform_date,
       corte: v.cutoff_date,
+      ...(v.confirm_date ? { confirmar: v.confirm_date } : {}),
       boleto: v.invoice_date,
       vencimento: v.due_date,
     },
@@ -181,6 +187,7 @@ function paraLinha(v: LinhaDaView): LinhaDoControle {
             em: v.last_message_at,
           }
         : null,
+    emissaoConfirmadaEm: v.issue_confirmed_at,
     coleta: {
       temLink: v.has_collection_link === true,
       // O banco guarda o instante; a decisão de prazo é por DIA, e é assim que

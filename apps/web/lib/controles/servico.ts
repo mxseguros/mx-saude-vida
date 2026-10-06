@@ -82,7 +82,7 @@ export async function abrirCompetencia(
 
     const { data: clientes, error: erroClientes } = await supabase
       .from("clients")
-      .select("id, inform_day, cutoff_day, invoice_day, due_day")
+      .select("id, inform_day, cutoff_day, confirm_day, invoice_day, due_day")
       .eq("active", true)
       .is("deleted_at", null);
 
@@ -100,6 +100,7 @@ export async function abrirCompetencia(
       id: string;
       inform_day: number | null;
       cutoff_day: number | null;
+      confirm_day: number | null;
       invoice_day: number;
       due_day: number;
     }[]) {
@@ -108,6 +109,7 @@ export async function abrirCompetencia(
       const regras = {
         informarDia: cliente.inform_day,
         corteDia: cliente.cutoff_day,
+        confirmarDia: cliente.confirm_day,
         boletoDia: cliente.invoice_day,
         vencimentoDia: cliente.due_day,
       };
@@ -122,6 +124,7 @@ export async function abrirCompetencia(
         step: dePasso(passoInicial(regras)),
         inform_date: datas.informar,
         cutoff_date: datas.corte,
+        confirm_date: datas.confirmar ?? null,
         invoice_date: datas.boleto,
         due_date: datas.vencimento,
       });

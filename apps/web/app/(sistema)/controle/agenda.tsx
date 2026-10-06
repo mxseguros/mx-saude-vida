@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { ConfirmarEmissao } from "@/componentes/confirmar-emissao";
+
 import {
   ACAO_DA_ATIVIDADE,
   CURTO_ATIVIDADE,
@@ -30,6 +32,7 @@ import {
 const COR: Record<TipoDeAtividade, { fundo: string; texto: string; marca: string }> = {
   informar: { fundo: "bg-accent-soft", texto: "text-on-accent-soft", marca: "bg-brand" },
   corte: { fundo: "bg-surface-3", texto: "text-muted", marca: "bg-[var(--mx-navy)]" },
+  confirmar: { fundo: "bg-surface-2", texto: "text-heading", marca: "bg-brand" },
   boleto: { fundo: "bg-ok-soft", texto: "text-ok", marca: "bg-ok" },
   vencimento: { fundo: "bg-warn-soft", texto: "text-warn", marca: "bg-warn" },
 };
@@ -371,7 +374,11 @@ function Grupo({ titulo, lista, alerta = false }: { titulo: string; lista: Ativi
               {atividade.analista ? ` · ${atividade.analista}` : ""}
             </span>
 
-            {atividade.estado !== "feita" ? (
+            {atividade.estado !== "feita" && atividade.tipo === "confirmar" ? (
+              <div className="mt-0.5">
+                <ConfirmarEmissao controleId={atividade.controleId} variante="texto" />
+              </div>
+            ) : atividade.estado !== "feita" ? (
               <Link
                 href={
                   atividade.tipo === "boleto" || atividade.passo === "planilha_recebida"

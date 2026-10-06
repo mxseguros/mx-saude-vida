@@ -1,4 +1,4 @@
-# Status — 06/10/2026 (fim do dia)
+# Status — 07/10/2026
 
 Leia este arquivo primeiro ao retomar. Os planos longos ficam para consulta pontual.
 
@@ -10,16 +10,16 @@ Leia este arquivo primeiro ao retomar. Os planos longos ficam para consulta pont
 - Conferir: cruza o informado com a planilha (4 apontamentos, nenhum bloqueia).
 - Cliente › Apólice: upload do PDF, agente preenche (✦), analista salva. Registro da IA (`ai_runs`, teto, cache) corrigido em 06/10.
 - Alertas (`/alertas`) e sino no menu com atrasados + hoje; somem quando a ação é registrada. Sem filtro por analista e sem aviso diário (decisão de 06/10).
-- Cliente › Funcionários (`/clientes/[id]/funcionarios`): base de vidas, demitir/readmitir, importar com prévia, capital pela apólice.
-- 425 testes, 88 provas Playwright, RLS e CI verdes.
+- Ficha do cliente em abas (`?aba=`): Cadastro e apólice · Funcionários (base de vidas, demitir/readmitir, importar, capital pela apólice) · Movimentações · Boletos.
+- 5ª data "Confirmar emissão" (opcional por cliente): atividade no Controle, Alertas e agenda, botão Confirmar.
+- 429 testes, 89 provas Playwright, RLS e CI verdes.
 
 ## Direção
 
 Área MX segue **fielmente o protótipo v0.7** (`Docs/`, fora do git). Área do cliente: ignorar.
 
-## Próximos itens (ordem aprovada: 1 e 2 feitos)
+## Próximos itens (ordem aprovada: 1, 2 e 3 feitos)
 
-3. Cliente — abas Movimentações e Boletos; 5ª data (confirmar emissão D+1).
 4. Configurações — Setores e gestores (vira lista nos Funcionários), Modelo de planilha, novo usuário em modal.
 5. Baixar base.
 - Depois: De/Para (cruzar movimentação com Funcionários).

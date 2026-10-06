@@ -94,6 +94,7 @@ export const esquemaCliente = z
     // Regras do mês.
     informarDia: diaDoMes("Informar até"),
     corteDia: diaDoMes("Corte"),
+    confirmarDia: diaDoMes("Confirmar emissão"),
     boletoDia: diaObrigatorio("Emissão do boleto"),
     vencimentoDia: diaObrigatorio("Vencimento"),
     /**
@@ -124,6 +125,10 @@ export const esquemaCliente = z
   // Quem tem data de informar tem data de corte: sem uma das duas, o mês não
   // sabe quando cobrar nem quando fecha. Apólice sem movimentação deixa as
   // DUAS em branco e começa no boleto.
+  .refine((c) => c.confirmarDia === null || c.corteDia !== null, {
+    message: "Confirmar emissão vem depois do corte: preencha o corte também.",
+    path: ["confirmarDia"],
+  })
   .refine((c) => (c.informarDia === null) === (c.corteDia === null), {
     message: 'Preencha "Informar até" e "Corte" juntos, ou deixe os dois em branco.',
     path: ["corteDia"],

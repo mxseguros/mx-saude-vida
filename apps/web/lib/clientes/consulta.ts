@@ -37,6 +37,7 @@ export type ClienteCompleto = ClienteDaLista & {
   seguradoraId: number | null;
   observacoes: string | null;
   informarDia: number | null;
+  confirmarDia: number | null;
   boletoDia: number;
   gestorNome: string | null;
   gestorCelular: string | null;
@@ -46,7 +47,7 @@ export type ClienteCompleto = ClienteDaLista & {
 const CAMPOS_DA_LISTA =
   "id, legal_name, trade_name, document, product, channel, cutoff_day, due_day, mx_tracks_payment, active, insurers(name)";
 
-const CAMPOS_COMPLETOS = `${CAMPOS_DA_LISTA}, insurer_id, notes, inform_day, invoice_day, manager_name, manager_phone, manager_email`;
+const CAMPOS_COMPLETOS = `${CAMPOS_DA_LISTA}, insurer_id, notes, inform_day, confirm_day, invoice_day, manager_name, manager_phone, manager_email`;
 
 type LinhaDaLista = {
   id: string;
@@ -67,6 +68,7 @@ type LinhaCompleta = LinhaDaLista & {
   insurer_id: number | null;
   notes: string | null;
   inform_day: number | null;
+  confirm_day: number | null;
   invoice_day: number;
   manager_name: string | null;
   manager_phone: string | null;
@@ -101,6 +103,7 @@ function paraCompleto(linha: LinhaCompleta): ClienteCompleto {
     seguradoraId: linha.insurer_id,
     observacoes: linha.notes,
     informarDia: linha.inform_day,
+    confirmarDia: linha.confirm_day,
     boletoDia: linha.invoice_day,
     gestorNome: linha.manager_name,
     gestorCelular: linha.manager_phone,

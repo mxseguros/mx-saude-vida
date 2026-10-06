@@ -16,11 +16,12 @@ import { CHAVES_DE_DATA, PASSOS, situacaoDoPrazo, type ChaveDeData, type DatasDo
  */
 
 /** Uma por data do mês. É a lista do protótipo v0.8. */
-export type TipoDeAtividade = "informar" | "corte" | "boleto" | "vencimento";
+export type TipoDeAtividade = "informar" | "corte" | "confirmar" | "boleto" | "vencimento";
 
 export const TIPOS_DE_ATIVIDADE: readonly TipoDeAtividade[] = [
   "informar",
   "corte",
+  "confirmar",
   "boleto",
   "vencimento",
 ] as const;
@@ -28,6 +29,7 @@ export const TIPOS_DE_ATIVIDADE: readonly TipoDeAtividade[] = [
 export const ROTULO_ATIVIDADE: Record<TipoDeAtividade, string> = {
   informar: "Informar até",
   corte: "Corte",
+  confirmar: "Confirmar emissão",
   boleto: "Boleto",
   vencimento: "Vencimento",
 };
@@ -36,6 +38,7 @@ export const ROTULO_ATIVIDADE: Record<TipoDeAtividade, string> = {
 export const CURTO_ATIVIDADE: Record<TipoDeAtividade, string> = {
   informar: "informar",
   corte: "corte",
+  confirmar: "confirmar",
   boleto: "boleto",
   vencimento: "vencer",
 };
@@ -44,6 +47,7 @@ export const CURTO_ATIVIDADE: Record<TipoDeAtividade, string> = {
 export const ACAO_DA_ATIVIDADE: Record<TipoDeAtividade, string> = {
   informar: "Enviar mensagem",
   corte: "Enviar mensagem",
+  confirmar: "Confirmar",
   boleto: "Anexar boleto",
   vencimento: "Marcar pago",
 };
@@ -70,6 +74,8 @@ export type EstadoDaAtividade = "feita" | "pendente" | "atrasada";
 const CONCLUI: Record<TipoDeAtividade, Passo> = {
   informar: "planilha_recebida",
   corte: "corte",
+  // Feita também pelo carimbo `emissaoConfirmada`; anexado o boleto, deixa de importar.
+  confirmar: "boleto",
   boleto: "boleto",
   vencimento: "concluida",
 };
@@ -78,6 +84,7 @@ const CONCLUI: Record<TipoDeAtividade, Passo> = {
 const DATA_DA_ATIVIDADE: Record<TipoDeAtividade, ChaveDeData> = {
   informar: "informar",
   corte: "corte",
+  confirmar: "confirmar",
   boleto: "boleto",
   vencimento: "vencimento",
 };
@@ -109,6 +116,8 @@ export type MesParaAgenda = {
   datas: DatasDoMes;
   /** `false` = a seguradora cobra direto: não há vencimento a controlar. */
   acompanhaPagamento: boolean;
+  /** A analista já clicou em Confirmar emissão neste mês. */
+  emissaoConfirmada?: boolean;
 };
 
 /**
@@ -127,9 +136,9 @@ export function atividadesDoMes(mes: MesParaAgenda, hoje: string): Atividade[] {
     if (tipo === "vencimento" && !mes.acompanhaPagamento) continue;
 
     const dia = mes.datas[DATA_DA_ATIVIDADE[tipo]];
-    if (dia === null) continue;
+    if (dia === null || dia === undefined) continue;
 
-    const cumprida = feitas >= ordem(CONCLUI[tipo]);
+    const cumprida = feitas >= ordem(CONCLUI[tipo]) || (tipo === "confirmar" && mes.emissaoConfirmada === true);
     const situacao = situacaoDoPrazo(dia, hoje);
 
     const estado: EstadoDaAtividade = cumprida
