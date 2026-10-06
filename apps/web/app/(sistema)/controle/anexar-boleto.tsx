@@ -27,7 +27,16 @@ import type { LinhaDoControle } from "@/lib/controles/consulta";
 
 type Anexo = { id: string; nome: string; tamanho: number };
 
-export function AnexarBoleto({ linha, rotulo }: { linha: LinhaDoControle; rotulo: string }) {
+export function AnexarBoleto({
+  linha,
+  rotulo,
+  grande = false,
+}: {
+  linha: Pick<LinhaDoControle, "id" | "razaoSocial" | "nomeFantasia">;
+  rotulo: string;
+  /** Na aba Boletos do cliente o botão é de tamanho normal; na linha do Controle, compacto. */
+  grande?: boolean;
+}) {
   const router = useRouter();
   const aviso = useAviso();
 
@@ -153,7 +162,7 @@ export function AnexarBoleto({ linha, rotulo }: { linha: LinhaDoControle; rotulo
           limpar();
           setAberto(true);
         }}
-        className="min-h-[32px] px-2.5 text-[12px] sm:min-h-[32px]"
+        className={grande ? "" : "min-h-[32px] px-2.5 text-[12px] sm:min-h-[32px]"}
       >
         {rotulo}
       </Botao>
@@ -298,7 +307,7 @@ export function AnexarBoleto({ linha, rotulo }: { linha: LinhaDoControle; rotulo
           ) : null}
 
           <p className="rounded-[8px] bg-surface-2 px-3 py-2.5 text-[12.5px] leading-relaxed text-texto">
-            Ao salvar, o boleto vai para Meus documentos do cliente e a movimentação avança. A mensagem de boleto
+            Ao salvar, o boleto fica na aba Boletos do cliente e a movimentação avança. A mensagem de boleto
             sai na hora pelo canal dele: por e-mail, com o PDF em anexo; por WhatsApp, fica pronta para você abrir
             no botão da linha.
           </p>

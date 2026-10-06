@@ -20,6 +20,7 @@ import { perfilAtual } from "@/lib/supabase/servidor";
 
 import { FormularioCliente } from "../formulario";
 import { Abas, abaDe } from "./abas";
+import { AnexarBoletoDoCliente } from "./anexar-boleto-do-cliente";
 import { Documentos } from "./acervo";
 import { BlocoDaApolice } from "./apolice";
 import { Boletos } from "./boletos";
@@ -112,8 +113,18 @@ export default async function PaginaCliente({
   }
 
   if (aba === "boletos") {
-    const boletos = await listarBoletos(id);
-    conteudo = boletos.erro ? <Erro mensagem={boletos.erro} /> : <Boletos lista={boletos.dados} />;
+    const [boletos, meses] = await Promise.all([listarBoletos(id), listarMovimentacoes(id)]);
+    conteudo = boletos.erro ? (
+      <Erro mensagem={boletos.erro} />
+    ) : (
+      <div className="flex flex-col gap-4">
+        <AnexarBoletoDoCliente
+          meses={meses.dados.map((m) => ({ controleId: m.controleId, competencia: m.competencia, passo: m.passo }))}
+          cliente={{ razaoSocial: cliente.dados.razaoSocial, nomeFantasia: cliente.dados.nomeFantasia }}
+        />
+        <Boletos lista={boletos.dados} />
+      </div>
+    );
   }
 
   return (
