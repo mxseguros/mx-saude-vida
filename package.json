@@ -28,7 +28,8 @@
   },
   "pnpm": {
     "overrides": {
-      "postcss": ">=8.5.12"
+      "postcss": ">=8.5.12",
+      "source-map-js": ">=1.2.2"
     }
   }
 }
