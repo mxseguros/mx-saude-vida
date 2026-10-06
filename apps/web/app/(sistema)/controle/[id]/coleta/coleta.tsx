@@ -101,7 +101,7 @@ export function Coleta({
   async function copiar() {
     if (!urlAtual) return;
     try {
-      await navigator.clipboard.writeText(urlAtual);
+      await navigator.clipboard.writeText(linkComCartao(urlAtual));
       aviso.mostrar("Link copiado.");
     } catch {
       aviso.mostrar("Não consegui copiar o link.");
