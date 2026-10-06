@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   cepValido,
+  dataBrParaIso,
+  isoParaDataBr,
+  mascararData,
   mascararInteiro,
   emailValido,
   formatarMoeda,
@@ -191,5 +194,19 @@ describe("valor digitado vira numero", () => {
   it("o que nao e numero vira null, nunca zero", () => {
     expect(valorParaNumero("")).toBeNull();
     expect(valorParaNumero("a combinar")).toBeNull();
+  });
+});
+
+describe("data dd/mm/aaaa", () => {
+  it("mascara progressiva", () => {
+    expect(mascararData("12")).toBe("12");
+    expect(mascararData("1203")).toBe("12/03");
+    expect(mascararData("12031990")).toBe("12/03/1990");
+  });
+  it("converte e recusa data inexistente", () => {
+    expect(dataBrParaIso("12/03/1990")).toBe("1990-03-12");
+    expect(dataBrParaIso("29/02/2023")).toBeNull();
+    expect(dataBrParaIso("29/02/2024")).toBe("2024-02-29");
+    expect(isoParaDataBr("1990-03-12")).toBe("12/03/1990");
   });
 });

@@ -113,6 +113,13 @@ test.describe("coleta pela equipe", () => {
     expect(resposta.ok()).toBe(false);
   });
 
+  test("anexar a planilha exige sessão", async ({ request }) => {
+    const resposta = await request.post(`/api/v1/controles/${MES}/planilha`, {
+      multipart: { arquivo: { name: "p.xlsx", mimeType: "application/vnd.ms-excel", buffer: Buffer.from("x") } },
+    });
+    expect([401, 503]).toContain(resposta.status());
+  });
+
   test("a recusa não devolve token nenhum", async ({ request }) => {
     const resposta = await request.put(`/api/v1/controles/${MES}/coleta`, { data: { nome: "Quem Tentou" } });
     const corpo = await resposta.text();

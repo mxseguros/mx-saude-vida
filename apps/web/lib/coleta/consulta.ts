@@ -127,7 +127,7 @@ export async function lerColetaPorToken(token: string, hoje: string = hojeSaoPau
       // numa rota pública.
       const { data: pessoas } = await supabase
         .from("movements")
-        .select("id, kind, full_name, document, source")
+        .select("id, kind, full_name, document, birth_date, job_title, salary, source")
         .eq("control_id", linha.id)
         .eq("source", "manager")
         .order("kind")

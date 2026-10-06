@@ -1,7 +1,7 @@
 "use client";
 
 import { formatarData } from "@/lib/dominio/email";
-import { mascararDocumento, mascararTelefone } from "@/lib/dominio/mascaras";
+import { formatarMoeda, mascararData, mascararDocumento, mascararMoeda, mascararTelefone } from "@/lib/dominio/mascaras";
 import type { ColetaPublica } from "@/lib/coleta/consulta";
 import { ROTULO_MOVIMENTO } from "@/lib/dominio/coleta";
 
@@ -25,7 +25,8 @@ import {
  * mexe sem medo.
  */
 
-export type Pessoa = { nome: string; documento: string };
+/** Nascimento, cargo e salário só são usados na entrada. */
+export type Pessoa = { nome: string; documento: string; nascimento: string; cargo: string; salario: string };
 
 export type Planilha = { id: string; nome: string } | null;
 
@@ -154,8 +155,8 @@ export function EtapaPessoas({
         titulo={entrada ? "Quem entrou no seguro?" : "Quem saiu do seguro?"}
         lead={
           entrada
-            ? "As pessoas admitidas neste mês, que passam a ter cobertura."
-            : "As pessoas desligadas neste mês, que deixam de ter cobertura."
+            ? "Nome, CPF, nascimento, cargo e salário de cada admitido. Se não tiver algum dado à mão, deixe em branco."
+            : "Nome e CPF de cada desligado neste mês."
         }
       />
 
@@ -177,6 +178,26 @@ export function EtapaPessoas({
               onNome={(v) => onMudar(i, "nome", v)}
               onDocumento={(v) => onMudar(i, "documento", mascararDocumento(v))}
               onRemover={() => onRemover(i)}
+              inclusao={
+                entrada
+                  ? {
+                      nascimento: pessoa.nascimento,
+                      cargo: pessoa.cargo,
+                      salario: pessoa.salario,
+                      erros: {
+                        nascimento: erros[`${tipo}.${i}.nascimento`],
+                        cargo: erros[`${tipo}.${i}.cargo`],
+                        salario: erros[`${tipo}.${i}.salario`],
+                      },
+                      onMudar: (campo, v) =>
+                        onMudar(
+                          i,
+                          campo,
+                          campo === "nascimento" ? mascararData(v) : campo === "salario" ? mascararMoeda(v) : v,
+                        ),
+                    }
+                  : undefined
+              }
             />
           ))}
         </ul>
@@ -389,6 +410,13 @@ function ListaDeRevisao({
             <li key={i} className="flex flex-wrap items-baseline gap-x-2.5 text-[14.5px] text-[var(--cp-black)]">
               <span className="font-[500]">{p.nome || "Sem nome"}</span>
               <span className="cp-mono text-[12.5px] text-[var(--cp-ink-2)]">{p.documento || "sem CPF"}</span>
+              {tipo === "entradas" && (p.nascimento || p.cargo || p.salario) ? (
+                <span className="basis-full text-[12.5px] text-[var(--cp-ink-2)]">
+                  {[p.nascimento && `nasc. ${p.nascimento}`, p.cargo, p.salario && formatarMoeda(p.salario)]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </span>
+              ) : null}
             </li>
           ))}
         </ul>

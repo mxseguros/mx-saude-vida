@@ -179,6 +179,9 @@ async function gravarColeta(
           kind: deTipoDeMovimento(m.tipo),
           full_name: m.nome,
           document: m.documento,
+          birth_date: m.nascimento,
+          job_title: m.cargo,
+          salary: m.salario,
           source: deQuemDigitou(m.porQuem),
         })),
       );

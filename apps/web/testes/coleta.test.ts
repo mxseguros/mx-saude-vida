@@ -312,3 +312,59 @@ describe("o formulário do gestor", () => {
     if (!r.ok) expect(porCampo(r.erros).planilhaId).toBe("Arquivo inválido.");
   });
 });
+
+describe("entrada com dados de inclusão (06/10)", () => {
+  const base = {
+    nome: "Gestor Exemplo",
+    celular: "55555555555",
+    semMovimentacao: false,
+    saidas: [],
+    planilhaId: "",
+  };
+  const entrada = (troca: Record<string, unknown> = {}) =>
+    validar(esquemaColeta, {
+      ...base,
+      entradas: [{ nome: "Pessoa Que Entrou", documento: "", nascimento: "12/03/1990", cargo: "Operador", salario: "R$ 3.500,00", ...troca }],
+    });
+
+  it("nascimento, cargo e salário entram convertidos", () => {
+    const r = entrada();
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.dados.entradas[0]).toMatchObject({ nascimento: "1990-03-12", cargo: "Operador", salario: 3500 });
+  });
+
+  it("os três são opcionais", () => {
+    const r = entrada({ nascimento: "", cargo: "", salario: "" });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.dados.entradas[0]).toMatchObject({ nascimento: null, cargo: null, salario: null });
+  });
+
+  // O `Date` do JavaScript transformaria 31/02 em 03/03 sem avisar.
+  it("data que não existe é recusada, não corrigida", () => {
+    const r = entrada({ nascimento: "31/02/1990" });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(porCampo(r.erros)["entradas.0.nascimento"]).toMatch(/inválida/);
+  });
+
+  it("nascimento no futuro é recusado", () => {
+    const r = entrada({ nascimento: "01/01/2999" });
+    expect(r.ok).toBe(false);
+  });
+
+  it("salário zero é recusado", () => {
+    const r = entrada({ salario: "R$ 0,00" });
+    expect(r.ok).toBe(false);
+  });
+
+  it("saída não carrega dado de inclusão, mesmo que o corpo mande", () => {
+    const r = validar(esquemaColeta, {
+      ...base,
+      entradas: [],
+      saidas: [{ nome: "Pessoa Que Saiu", documento: "", nascimento: "12/03/1990", salario: "100" }],
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const [saida] = movimentosDaColeta(r.dados, "gestor");
+    expect(saida).toMatchObject({ tipo: "saida", nascimento: null, cargo: null, salario: null });
+  });
+});

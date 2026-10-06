@@ -1,79 +1,148 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Botao } from "@/componentes/ui/botao";
 import { Campo } from "@/componentes/ui/campo";
-import { useAviso } from "@/componentes/ui/aviso";
+import { Stepper } from "@/componentes/ui/stepper";
 import type { LinhaDoControle } from "@/lib/controles/consulta";
 import { esquemaColeta } from "@/lib/dominio/coleta";
-import { nomeDoMes } from "@/lib/dominio/controle";
-import { mascararDocumento, mascararTelefone } from "@/lib/dominio/mascaras";
+import { nomeDoMes, rotuloDaCompetencia } from "@/lib/dominio/controle";
+import { formatarDocumento } from "@/lib/dominio/documento";
+import { formatarData } from "@/lib/dominio/email";
+import {
+  formatarMoeda,
+  mascararData,
+  mascararDocumento,
+  mascararMoeda,
+  mascararTelefone,
+} from "@/lib/dominio/mascaras";
 import { porCampo, validar } from "@/lib/dominio/validar";
 
 /**
- * A movimentação digitada pela analista.
+ * "Ou preencha agora": a coleta digitada pela analista, nas 5 etapas do
+ * protótipo v0.7 (tLink) — Dados · Entradas · Saídas · Planilha · Revisão.
  *
- * As MESMAS cinco seções do formulário do gestor, na mesma ordem, com o MESMO
- * esquema zod — mas numa página só, e não em cinco passos.
- *
- * O plano pedia as cinco etapas aqui também. Não entregar a paginação é
- * deliberado, e o motivo é quem está na frente da tela: o gestor preenche no
- * celular, onde uma pergunta por vez é o que cabe; a analista está no
- * computador com o cliente no telefone ditando nomes, e cinco cliques entre
- * "Maria" e "João" são cinco chances de perder o fio. As regras são as mesmas —
- * é o mesmo esquema, validado no mesmo lugar —, e é isso que o plano queria
- * garantir.
+ * Registrar sem ninguém informado é válido: a coleta nasce com link e fica no
+ * Controle aguardando o gestor. Com pessoas ou planilha, a movimentação entra
+ * marcada como digitada pela MX.
  */
+
+const ETAPAS = [
+  { chave: "dados", rotulo: "Dados", titulo: "Quem é o segurado", lead: "O mínimo para não perder o contato: segurado, competência, gestor e celular." },
+  { chave: "entradas", rotulo: "Entradas", titulo: "Quem entrou", lead: "Se o gestor já passou por telefone. Senão, ele informa pelo link." },
+  { chave: "saidas", rotulo: "Saídas", titulo: "Quem saiu", lead: "Se o gestor já passou por telefone. Senão, ele informa pelo link." },
+  { chave: "planilha", rotulo: "Planilha", titulo: "Planilha do mês", lead: "Se tiver em mãos.", opcional: true },
+  { chave: "revisao", rotulo: "Revisão", titulo: "Atendimento e revisão", lead: "Analista responsável e o que ficou registrado." },
+] as const;
+
+type Pessoa = { nome: string; documento: string; nascimento: string; cargo: string; salario: string };
+const VAZIA: Pessoa = { nome: "", documento: "", nascimento: "", cargo: "", salario: "" };
+
+const CAMPOS_DA_ETAPA = [["nome", "celular"], ["entradas"], ["saidas"], ["planilhaId"], []] as const;
+
 export function FormularioDaEquipe({
   linha,
-  nome: nomeInicial,
-  celular: celularInicial,
-  setor: setorInicial,
-  onFechar,
+  cliente,
+  apolice,
+  analista,
+  valeAte,
+  temLink,
+  nome,
+  celular,
+  onNome,
+  onCelular,
+  onRegistrada,
 }: {
   linha: LinhaDoControle;
+  cliente: string;
+  apolice: string | null;
+  analista: string;
+  valeAte: string;
+  /** Já existe link: registrar não pode refazê-lo, senão mata o do gestor. */
+  temLink: boolean;
   nome: string;
   celular: string;
-  setor: string;
-  onFechar: () => void;
+  onNome: (v: string) => void;
+  onCelular: (v: string) => void;
+  /** Depois de registrar: a tela troca para o envio pelo WhatsApp. */
+  onRegistrada: (protocolo: string) => void;
 }) {
   const router = useRouter();
-  const aviso = useAviso();
-
-  const [nome, setNome] = useState(nomeInicial);
-  const [celular, setCelular] = useState(celularInicial);
-  const [setor, setSetor] = useState(setorInicial);
+  const [etapa, setEtapa] = useState(0);
   const [semMovimentacao, setSemMovimentacao] = useState(false);
-  const [entradas, setEntradas] = useState<Pessoa[]>([{ nome: "", documento: "" }]);
-  const [saidas, setSaidas] = useState<Pessoa[]>([]);
-  const [observacao, setObservacao] = useState("");
-
+  const [entradas, setEntradas] = useState<Pessoa[]>([{ ...VAZIA }]);
+  const [saidas, setSaidas] = useState<Pessoa[]>([{ ...VAZIA }]);
+  const [planilha, setPlanilha] = useState<{ id: string; nome: string } | null>(null);
+  const [subindo, setSubindo] = useState(false);
   const [erros, setErros] = useState<Record<string, string>>({});
   const [recado, setRecado] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  const arquivo = useRef<HTMLInputElement>(null);
+
+  const preenchidas = (l: Pessoa[]) => l.filter((p) => Object.values(p).some((v) => v.trim()));
+  const informou = semMovimentacao || preenchidas(entradas).length + preenchidas(saidas).length > 0 || planilha;
 
   function corpo() {
     return {
       nome,
       celular,
-      setor,
+      setor: "",
       semMovimentacao,
-      entradas: semMovimentacao ? [] : entradas.filter(temAlgo),
-      saidas: semMovimentacao ? [] : saidas.filter(temAlgo),
-      // A planilha não entra por aqui: quem a anexa é a tela de conferir, que
-      // já lê o arquivo e aponta linha com campo em branco. Dois caminhos de
-      // upload para o mesmo arquivo seriam dois lugares para corrigir.
-      planilhaId: "",
-      observacao,
+      entradas: semMovimentacao ? [] : preenchidas(entradas),
+      saidas: semMovimentacao ? [] : preenchidas(saidas).map(({ nome: n, documento }) => ({ nome: n, documento })),
+      planilhaId: planilha?.id ?? "",
+      observacao: "",
     };
   }
 
-  async function registrar() {
+  function errosDaEtapa(indice: number): Record<string, string> {
     const analise = validar(esquemaColeta, corpo());
-    if (!analise.ok) {
-      setErros(porCampo(analise.erros));
+    if (analise.ok) return {};
+    const todos = porCampo(analise.erros);
+    // Registrar sem movimentação é válido aqui: a coleta espera o gestor.
+    if (!informou) delete todos.semMovimentacao;
+    const campos: readonly string[] = CAMPOS_DA_ETAPA[indice] ?? [];
+    if (!campos.length) return todos;
+    return Object.fromEntries(
+      Object.entries(todos).filter(([c]) => campos.some((p) => c === p || c.startsWith(`${p}.`))),
+    );
+  }
+
+  function ir(destino: number) {
+    setErros({});
+    setEtapa(destino);
+  }
+
+  function continuar() {
+    const meus = errosDaEtapa(etapa);
+    setErros(meus);
+    if (!Object.keys(meus).length) setEtapa((e) => e + 1);
+  }
+
+  async function subir(escolhido: File | undefined) {
+    if (!escolhido) return;
+    setSubindo(true);
+    setRecado(null);
+    try {
+      const dados = new FormData();
+      dados.append("arquivo", escolhido);
+      const resposta = await fetch(`/api/v1/controles/${linha.id}/planilha`, { method: "POST", body: dados });
+      const json = await resposta.json().catch(() => null);
+      if (!resposta.ok) setRecado(json?.error?.message ?? "Não foi possível anexar a planilha.");
+      else setPlanilha({ id: json.data.id, nome: json.data.nome });
+    } catch {
+      setRecado("Não foi possível falar com o servidor.");
+    } finally {
+      setSubindo(false);
+    }
+  }
+
+  async function registrar() {
+    const todos = errosDaEtapa(4);
+    setErros(todos);
+    if (Object.keys(todos).length) {
       setRecado("Confira os campos destacados.");
       return;
     }
@@ -81,22 +150,35 @@ export function FormularioDaEquipe({
     setSalvando(true);
     setRecado(null);
     try {
-      const resposta = await fetch(`/api/v1/controles/${linha.id}/coleta`, {
-        method: "POST",
+      // Gera o link se ainda não houver: é por ele que o gestor confirma ou
+      // completa. O que já existe fica — refazer mataria o que ele recebeu.
+      const link = temLink ? null : await fetch(`/api/v1/controles/${linha.id}/coleta`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(corpo()),
+        body: JSON.stringify({ nome, celular, setor: "" }),
       });
-      const json = await resposta.json().catch(() => null);
-
-      if (!resposta.ok) {
-        const lista = json?.error?.fields as { campo: string; mensagem: string }[] | undefined;
-        if (lista?.length) setErros(Object.fromEntries(lista.map((e) => [e.campo, e.mensagem])));
-        setRecado(json?.error?.message ?? "Não foi possível registrar a coleta.");
+      const jsonLink = link ? await link.json().catch(() => null) : null;
+      if (link && !link.ok) {
+        setRecado(jsonLink?.error?.message ?? "Não foi possível registrar a coleta.");
         return;
       }
 
-      aviso.mostrar(`Coleta registrada. Protocolo ${json?.data?.protocolo ?? ""}.`);
-      onFechar();
+      if (informou) {
+        const resposta = await fetch(`/api/v1/controles/${linha.id}/coleta`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(corpo()),
+        });
+        const json = await resposta.json().catch(() => null);
+        if (!resposta.ok) {
+          const lista = json?.error?.fields as { campo: string; mensagem: string }[] | undefined;
+          if (lista?.length) setErros(Object.fromEntries(lista.map((e) => [e.campo, e.mensagem])));
+          setRecado(json?.error?.message ?? "Não foi possível registrar a movimentação.");
+          return;
+        }
+      }
+
+      onRegistrada(linha.protocolo ?? "");
       router.refresh();
     } catch {
       setRecado("Não foi possível falar com o servidor. O que você digitou continua aqui.");
@@ -105,20 +187,19 @@ export function FormularioDaEquipe({
     }
   }
 
+  const atual = ETAPAS[etapa]!;
+
   return (
-    <section className="flex flex-col gap-5 rounded-[10px] border border-line bg-surface p-4 sm:p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <h2 className="m-0 font-(family-name:--font-display) text-[16px] font-[600] text-heading">
-            Movimentação de {nomeDoMes(linha.competencia)}
-          </h2>
-          <p className="m-0 text-[13px] text-muted">
-            O que você digitar fica marcado como vindo da MX, e não do gestor.
-          </p>
-        </div>
-        <Botao variante="texto" onClick={onFechar}>
-          Fechar
-        </Botao>
+    <div className="flex flex-col gap-5">
+      <Stepper etapas={ETAPAS} atual={etapa} onIr={ir} rotulo="Etapas da coleta" />
+
+      <div className="flex flex-col gap-1">
+        <span className="text-[12px] font-[600] uppercase tracking-[0.05em] text-muted">
+          Etapa {etapa + 1} de {ETAPAS.length}
+          {"opcional" in atual ? " · opcional" : ""}
+        </span>
+        <h2 className="m-0 font-(family-name:--font-display) text-[17px] font-[600] text-heading">{atual.titulo}</h2>
+        <p className="m-0 text-[13px] text-muted">{atual.lead}</p>
       </div>
 
       {recado ? (
@@ -127,119 +208,164 @@ export function FormularioDaEquipe({
         </p>
       ) : null}
 
-      {/* 1 · Quem informou */}
-      <Secao titulo="1 · Quem informou">
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Campo rotulo="Nome" value={nome} onChange={(e) => setNome(e.target.value)} erro={erros.nome} required />
+      {etapa === 0 ? (
+        <div className="grid items-start gap-3 sm:grid-cols-2">
+          <Campo rotulo="Segurado" value={cliente} readOnly />
+          <Campo rotulo="Competência" value={rotuloDaCompetencia(linha.competencia)} readOnly />
+          <Campo rotulo="CNPJ" value={formatarDocumento(linha.documento)} readOnly />
+          <Campo rotulo="Apólice" value={apolice ?? "Não cadastrada"} readOnly />
+          <Campo rotulo="Gestor responsável" value={nome} onChange={(e) => onNome(e.target.value)} erro={erros.nome} required />
           <Campo
-            rotulo="Celular"
+            rotulo="Celular (WhatsApp)"
             value={celular}
-            onChange={(e) => setCelular(mascararTelefone(e.target.value))}
+            onChange={(e) => onCelular(mascararTelefone(e.target.value))}
             erro={erros.celular}
             inputMode="tel"
             required
+            dica="Para onde vai o link e a confirmação."
           />
-          <Campo
-            rotulo="Setor"
-            value={setor}
-            onChange={(e) => setSetor(e.target.value)}
-            erro={erros.setor}
-            dica="Opcional."
+          <label className="flex items-start gap-2.5 text-[13.5px] text-texto sm:col-span-2">
+            <input
+              type="checkbox"
+              checked={semMovimentacao}
+              onChange={(e) => setSemMovimentacao(e.target.checked)}
+              className="mt-[3px] size-4 accent-[var(--brand)]"
+            />
+            O gestor informou que ninguém entrou nem saiu em {nomeDoMes(linha.competencia)}.
+          </label>
+        </div>
+      ) : null}
+
+      {etapa === 1 || etapa === 2 ? (
+        semMovimentacao ? (
+          <p className="m-0 text-[13.5px] text-muted">Marcado como sem movimentação na etapa Dados.</p>
+        ) : (
+          <Pessoas
+            tipo={etapa === 1 ? "entradas" : "saidas"}
+            pessoas={etapa === 1 ? entradas : saidas}
+            erros={erros}
+            onMudar={(lista) => (etapa === 1 ? setEntradas(lista) : setSaidas(lista))}
+          />
+        )
+      ) : null}
+
+      {etapa === 3 ? (
+        <div className="flex flex-col gap-2.5">
+          <button
+            type="button"
+            onClick={() => arquivo.current?.click()}
+            disabled={subindo}
+            className="flex flex-col items-center gap-1 rounded-[8px] border-2 border-dashed border-line bg-surface-2 px-4 py-6 text-center"
+          >
+            <b className="text-[14px] font-[600] text-heading">
+              {subindo ? "Enviando…" : planilha ? planilha.nome : "Planilha do cliente"}
+            </b>
+            <span className="text-[12.5px] text-muted">
+              {planilha ? "Anexada · clique para trocar" : "xlsx ou csv, se o gestor já mandou"}
+            </span>
+          </button>
+          {planilha ? (
+            <div>
+              <Botao variante="texto" onClick={() => setPlanilha(null)}>
+                Tirar esta planilha
+              </Botao>
+            </div>
+          ) : null}
+          <input
+            ref={arquivo}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            className="hidden"
+            onChange={(e) => {
+              void subir(e.target.files?.[0]);
+              e.target.value = "";
+            }}
           />
         </div>
+      ) : null}
 
-        <label className="flex items-start gap-2.5 text-[13.5px] leading-[1.45] text-texto">
-          <input
-            type="checkbox"
-            checked={semMovimentacao}
-            onChange={(e) => setSemMovimentacao(e.target.checked)}
-            className="mt-[3px] size-4 shrink-0 accent-[var(--brand)]"
-          />
-          <span>
-            Ninguém entrou nem saiu em {nomeDoMes(linha.competencia)}.
-            <span className="block text-[12.5px] text-muted">
-              Marcar isto fecha a conferência do mês: não há planilha a conferir.
-            </span>
-          </span>
-        </label>
-        {erros.semMovimentacao ? (
-          <p role="alert" className="text-[13px] text-bad">
-            {erros.semMovimentacao}
-          </p>
-        ) : null}
-      </Secao>
-
-      {semMovimentacao ? null : (
-        <>
-          {/* 2 e 3 · As pessoas */}
-          <Secao titulo="2 · Quem entrou">
-            <Pessoas
-              tipo="entradas"
-              pessoas={entradas}
-              erros={erros}
-              onMudar={(i, campo, valor) =>
-                setEntradas((l) => l.map((p, j) => (j === i ? { ...p, [campo]: valor } : p)))
-              }
-              onAdicionar={() => setEntradas((l) => [...l, { nome: "", documento: "" }])}
-              onRemover={(i) => setEntradas((l) => l.filter((_, j) => j !== i))}
+      {etapa === 4 ? (
+        <div className="flex flex-col gap-4">
+          <div className="grid items-start gap-3 sm:grid-cols-2">
+            <Campo rotulo="Analista responsável" value={analista} readOnly />
+            <Campo
+              rotulo="Link vale até"
+              value={formatarData(valeAte)}
+              readOnly
+              dica={linha.datas.corte ? `corte em ${formatarData(linha.datas.corte)}` : undefined}
             />
-          </Secao>
-
-          <Secao titulo="3 · Quem saiu">
-            <Pessoas
-              tipo="saidas"
-              pessoas={saidas}
-              erros={erros}
-              onMudar={(i, campo, valor) => setSaidas((l) => l.map((p, j) => (j === i ? { ...p, [campo]: valor } : p)))}
-              onAdicionar={() => setSaidas((l) => [...l, { nome: "", documento: "" }])}
-              onRemover={(i) => setSaidas((l) => l.filter((_, j) => j !== i))}
+          </div>
+          <dl className="m-0 flex flex-col">
+            <Revisao rotulo="Segurado" valor={`${cliente} · ${apolice ?? "sem apólice"} · ${rotuloDaCompetencia(linha.competencia).toLowerCase()}`} onEditar={() => ir(0)} />
+            <Revisao rotulo="Gestor" valor={[nome, celular].filter(Boolean).join(" · ") || "—"} erro={erros.nome ?? erros.celular} onEditar={() => ir(0)} />
+            <Revisao
+              rotulo="Entradas"
+              valor={semMovimentacao ? "Ninguém entrou" : resumo(preenchidas(entradas), true)}
+              vazio={!preenchidas(entradas).length}
+              onEditar={() => ir(1)}
             />
-          </Secao>
+            <Revisao
+              rotulo="Saídas"
+              valor={semMovimentacao ? "Ninguém saiu" : resumo(preenchidas(saidas), false)}
+              vazio={!preenchidas(saidas).length}
+              onEditar={() => ir(2)}
+            />
+            <Revisao rotulo="Planilha" valor={planilha?.nome ?? "Não enviada · opcional"} vazio={!planilha} onEditar={() => ir(3)} />
+          </dl>
+        </div>
+      ) : null}
 
-          {/* 4 · Planilha */}
-          <Secao titulo="4 · Planilha">
-            <p className="m-0 text-[13px] leading-[1.5] text-muted">
-              A planilha é anexada na tela de <strong className="font-[600]">Conferir</strong>, que já lê o arquivo e
-              aponta linha com campo em branco. Registre a movimentação aqui e anexe lá.
-            </p>
-          </Secao>
-        </>
-      )}
-
-      {/* 5 · Observação */}
-      <Secao titulo="5 · Observação">
-        <Campo
-          rotulo="O que o gestor disse"
-          value={observacao}
-          onChange={(e) => setObservacao(e.target.value)}
-          erro={erros.observacao}
-          dica="Opcional. Fica no histórico do mês."
-        />
-      </Secao>
-
-      <div className="flex flex-wrap gap-2.5">
-        <Botao onClick={() => void registrar()} disabled={salvando}>
-          {salvando ? "Registrando…" : "Registrar coleta"}
-        </Botao>
-        <Botao variante="texto" onClick={onFechar}>
-          Cancelar
-        </Botao>
+      <div className="flex flex-wrap items-center gap-2.5 border-t border-line pt-4">
+        {etapa > 0 ? (
+          <Botao variante="secundario" onClick={() => ir(etapa - 1)}>
+            ← Voltar
+          </Botao>
+        ) : (
+          <Botao variante="texto" onClick={() => ir(4)}>
+            Pular para a revisão
+          </Botao>
+        )}
+        <span className="flex-1" />
+        {etapa === 4 ? (
+          <Botao onClick={() => void registrar()} disabled={salvando}>
+            {salvando ? "Registrando…" : "Registrar coleta"}
+          </Botao>
+        ) : (
+          <Botao onClick={continuar}>{etapa === 3 && !planilha ? "Pular por agora →" : "Continuar →"}</Botao>
+        )}
       </div>
-    </section>
+    </div>
   );
 }
 
-/* --------------------------------------------------------------------------
-   Pedaços
-   -------------------------------------------------------------------------- */
+function resumo(pessoas: Pessoa[], entrada: boolean): string {
+  if (!pessoas.length) return entrada ? "Nenhuma · o gestor informa pelo link" : "Nenhuma · o gestor informa pelo link";
+  return pessoas.map((p) => p.nome || "sem nome").join(", ");
+}
 
-type Pessoa = { nome: string; documento: string };
-
-function Secao({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+function Revisao({
+  rotulo,
+  valor,
+  vazio = false,
+  erro,
+  onEditar,
+}: {
+  rotulo: string;
+  valor: string;
+  vazio?: boolean;
+  erro?: string;
+  onEditar: () => void;
+}) {
   return (
-    <div className="flex flex-col gap-3 border-t border-line pt-4 first:border-0 first:pt-0">
-      <h3 className="m-0 text-[12px] font-[600] uppercase tracking-[0.05em] text-muted">{titulo}</h3>
-      {children}
+    <div className="flex items-start justify-between gap-3 border-b border-line py-2.5">
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <dt className="text-[12px] text-muted">{rotulo}</dt>
+        <dd className={`m-0 break-words text-[13.5px] ${vazio ? "text-muted" : "font-[500] text-heading"}`}>{valor}</dd>
+        {erro ? <span className="text-[12.5px] text-bad">{erro}</span> : null}
+      </div>
+      <Botao variante="texto" onClick={onEditar} aria-label={`Editar ${rotulo.toLowerCase()}`}>
+        ✎ Editar
+      </Botao>
     </div>
   );
 }
@@ -249,64 +375,81 @@ function Pessoas({
   pessoas,
   erros,
   onMudar,
-  onAdicionar,
-  onRemover,
 }: {
   tipo: "entradas" | "saidas";
   pessoas: Pessoa[];
   erros: Record<string, string>;
-  onMudar: (i: number, campo: keyof Pessoa, valor: string) => void;
-  onAdicionar: () => void;
-  onRemover: (i: number) => void;
+  onMudar: (lista: Pessoa[]) => void;
 }) {
-  const verbo = tipo === "entradas" ? "entrou" : "saiu";
+  const entrada = tipo === "entradas";
+  const mudar = (i: number, campo: keyof Pessoa, valor: string) =>
+    onMudar(pessoas.map((p, j) => (j === i ? { ...p, [campo]: valor } : p)));
 
   return (
-    <>
-      {pessoas.length === 0 ? (
-        <p className="m-0 text-[13px] text-muted">Ninguém {verbo} neste mês.</p>
-      ) : (
-        <ul className="m-0 flex list-none flex-col gap-3 p-0">
-          {pessoas.map((pessoa, i) => (
-            <li key={i} className="grid items-start gap-3 sm:grid-cols-[1fr_200px_auto]">
-              <Campo
-                rotulo={i === 0 ? "Nome completo" : ""}
-                value={pessoa.nome}
-                onChange={(e) => onMudar(i, "nome", e.target.value)}
-                erro={erros[`${tipo}.${i}.nome`]}
-                autoComplete="off"
-              />
-              <Campo
-                rotulo={i === 0 ? "CPF" : ""}
-                value={pessoa.documento}
-                onChange={(e) => onMudar(i, "documento", mascararDocumento(e.target.value))}
-                erro={erros[`${tipo}.${i}.documento`]}
-                inputMode="numeric"
-                autoComplete="off"
-                dica={i === 0 ? "Pode ficar em branco." : undefined}
-              />
-              {/* Alinhado com os controles, e não com os rótulos: a grade do
-                  projeto pede rótulo e controle na mesma altura em toda linha. */}
-              <div className={i === 0 ? "sm:mt-[26px]" : ""}>
-                <Botao variante="texto" onClick={() => onRemover(i)} aria-label={`Remover a ${i + 1}ª pessoa`}>
-                  Remover
-                </Botao>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-
+    <div className="flex flex-col gap-3">
+      {pessoas.map((p, i) => (
+        <div key={i} className="flex flex-col gap-3 rounded-[8px] border border-line bg-surface p-3.5">
+          <div className="flex items-center justify-between">
+            <b className="text-[13px] font-[600] text-heading">{p.nome || (entrada ? "Quem entrou" : "Quem saiu")}</b>
+            <Botao variante="texto" onClick={() => onMudar(pessoas.filter((_, j) => j !== i))} aria-label={`Remover a ${i + 1}ª pessoa`}>
+              Remover
+            </Botao>
+          </div>
+          <div className="grid items-start gap-3 sm:grid-cols-2">
+            <Campo
+              rotulo="Nome completo"
+              value={p.nome}
+              onChange={(e) => mudar(i, "nome", e.target.value)}
+              erro={erros[`${tipo}.${i}.nome`]}
+              placeholder="Como está no RG"
+              autoComplete="off"
+            />
+            <Campo
+              rotulo="CPF"
+              value={p.documento}
+              onChange={(e) => mudar(i, "documento", mascararDocumento(e.target.value))}
+              erro={erros[`${tipo}.${i}.documento`]}
+              placeholder="000.000.000-00"
+              inputMode="numeric"
+              autoComplete="off"
+            />
+            {entrada ? (
+              <>
+                <Campo
+                  rotulo="Data de nascimento"
+                  value={p.nascimento}
+                  onChange={(e) => mudar(i, "nascimento", mascararData(e.target.value))}
+                  erro={erros[`${tipo}.${i}.nascimento`]}
+                  placeholder="dd/mm/aaaa"
+                  inputMode="numeric"
+                  autoComplete="off"
+                />
+                <Campo
+                  rotulo="Cargo"
+                  value={p.cargo}
+                  onChange={(e) => mudar(i, "cargo", e.target.value)}
+                  erro={erros[`${tipo}.${i}.cargo`]}
+                  autoComplete="off"
+                />
+                <Campo
+                  rotulo="Salário"
+                  value={p.salario}
+                  onChange={(e) => mudar(i, "salario", mascararMoeda(e.target.value))}
+                  erro={erros[`${tipo}.${i}.salario`]}
+                  placeholder={formatarMoeda(0)}
+                  inputMode="numeric"
+                  autoComplete="off"
+                />
+              </>
+            ) : null}
+          </div>
+        </div>
+      ))}
       <div>
-        <Botao variante="secundario" onClick={onAdicionar}>
-          {pessoas.length === 0 ? `Adicionar quem ${verbo}` : "Adicionar outra pessoa"}
+        <Botao variante="secundario" onClick={() => onMudar([...pessoas, { ...VAZIA }])}>
+          + Adicionar outra pessoa
         </Botao>
       </div>
-    </>
+    </div>
   );
-}
-
-/** Pessoa que a analista começou a preencher. Linha em branco não vai no envio. */
-function temAlgo(p: Pessoa): boolean {
-  return p.nome.trim() !== "" || p.documento.trim() !== "";
 }

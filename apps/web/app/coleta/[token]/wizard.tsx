@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 
 import type { ColetaPublica } from "@/lib/coleta/consulta";
 import { esquemaColeta } from "@/lib/dominio/coleta";
-import { mascararDocumento, mascararTelefone } from "@/lib/dominio/mascaras";
+import { formatarMoeda, isoParaDataBr, mascararDocumento, mascararTelefone } from "@/lib/dominio/mascaras";
 import { porCampo, validar } from "@/lib/dominio/validar";
 
 import { enviarColeta, enviarPlanilhaComProgresso } from "./enviar";
@@ -48,7 +48,7 @@ const CAMPOS_DA_ETAPA: readonly (readonly string[])[] = [
   [],
 ];
 
-const VAZIA: Pessoa = { nome: "", documento: "" };
+const VAZIA: Pessoa = { nome: "", documento: "", nascimento: "", cargo: "", salario: "" };
 
 export function Wizard({ token, coleta }: { token: string; coleta: ColetaPublica }) {
   // Pré-preenchido com o contato que a analista registrou ao mandar o link.
@@ -87,7 +87,8 @@ export function Wizard({ token, coleta }: { token: string; coleta: ColetaPublica
       setor,
       semMovimentacao,
       entradas: semMovimentacao ? [] : entradas.filter(temAlgo),
-      saidas: semMovimentacao ? [] : saidas.filter(temAlgo),
+      // A saída manda só nome e CPF: o resto do cartão nem aparece na tela.
+      saidas: semMovimentacao ? [] : saidas.filter(temAlgo).map(({ nome, documento }) => ({ nome, documento })),
       planilhaId: planilha?.id ?? "",
       observacao,
     };
@@ -347,15 +348,21 @@ export function Wizard({ token, coleta }: { token: string; coleta: ColetaPublica
 
 /** Pessoa que o gestor começou a preencher. Cartão em branco não vai no envio. */
 function temAlgo(p: Pessoa): boolean {
-  return p.nome.trim() !== "" || p.documento.trim() !== "";
+  return [p.nome, p.documento, p.nascimento, p.cargo, p.salario].some((v) => v.trim() !== "");
 }
 
 /** O que ele já havia enviado, para o reenvio partir dali e não do zero. */
 function pessoasDe(coleta: ColetaPublica, tipo: "entrada" | "saida"): Pessoa[] {
   const lista = (coleta.enviado?.movimentos ?? [])
     .filter((m) => m.tipo === tipo)
-    .map((m) => ({ nome: m.nome, documento: m.documento ? mascararDocumento(m.documento) : "" }));
-  return lista.length ? lista : [{ nome: "", documento: "" }];
+    .map((m) => ({
+      nome: m.nome,
+      documento: m.documento ? mascararDocumento(m.documento) : "",
+      nascimento: isoParaDataBr(m.nascimento),
+      cargo: m.cargo ?? "",
+      salario: m.salario === null ? "" : formatarMoeda(m.salario),
+    }));
+  return lista.length ? lista : [{ ...VAZIA }];
 }
 
 function rolarAoTopo() {

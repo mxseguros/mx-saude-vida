@@ -439,6 +439,7 @@ export function CartaoDePessoa({
   onNome,
   onDocumento,
   onRemover,
+  inclusao,
 }: {
   indice: number;
   /** "entrou" | "saiu" — completa o nome acessível dos controles. */
@@ -450,6 +451,14 @@ export function CartaoDePessoa({
   onNome: (valor: string) => void;
   onDocumento: (valor: string) => void;
   onRemover: () => void;
+  /** Só na entrada: nascimento, cargo e salário. A saída pede só nome e CPF. */
+  inclusao?: {
+    nascimento: string;
+    cargo: string;
+    salario: string;
+    erros: { nascimento?: string; cargo?: string; salario?: string };
+    onMudar: (campo: "nascimento" | "cargo" | "salario", valor: string) => void;
+  };
 }) {
   return (
     <li className="flex flex-col gap-3 rounded-[14px] border-[1.5px] border-[var(--cp-line)] bg-[var(--cp-white)] p-4">
@@ -491,6 +500,41 @@ export function CartaoDePessoa({
         placeholder="000.000.000-00"
         dica="Se não tiver em mãos, deixe em branco — a MX completa pela planilha."
       />
+
+      {inclusao ? (
+        <>
+          <Campo
+            rotulo="Data de nascimento"
+            value={inclusao.nascimento}
+            onChange={(e) => inclusao.onMudar("nascimento", e.target.value)}
+            erro={inclusao.erros.nascimento}
+            mono
+            inputMode="numeric"
+            autoComplete="off"
+            enterKeyHint="next"
+            placeholder="dd/mm/aaaa"
+          />
+          <Campo
+            rotulo="Cargo"
+            value={inclusao.cargo}
+            onChange={(e) => inclusao.onMudar("cargo", e.target.value)}
+            erro={inclusao.erros.cargo}
+            autoComplete="off"
+            enterKeyHint="next"
+          />
+          <Campo
+            rotulo="Salário"
+            value={inclusao.salario}
+            onChange={(e) => inclusao.onMudar("salario", e.target.value)}
+            erro={inclusao.erros.salario}
+            mono
+            inputMode="numeric"
+            autoComplete="off"
+            enterKeyHint="next"
+            placeholder="R$ 0,00"
+          />
+        </>
+      ) : null}
     </li>
   );
 }

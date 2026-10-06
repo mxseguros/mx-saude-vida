@@ -12,6 +12,7 @@ import { formatarMoeda, mascararDocumento } from "@/lib/dominio/mascaras";
 import { nomeDoMes, type Passo } from "@/lib/dominio/controle";
 import { ROTULO_APONTAMENTO, type Conferencia } from "@/lib/dominio/conferencia";
 import { formatarDocumento } from "@/lib/dominio/documento";
+import { isoParaDataBr } from "@/lib/dominio/mascaras";
 import type { Movimento } from "@/lib/dominio/coleta";
 import { ROTULO_COLUNA, type ColunaDaPlanilha, type LinhaDaPlanilha } from "@/lib/dominio/planilha";
 import type { PlanilhaDoMes } from "@/lib/controles/consulta";
@@ -585,6 +586,17 @@ function Informado({ movimentacao }: { movimentacao: Movimento[] }) {
                   <li key={i} className="flex flex-wrap items-baseline gap-x-2 text-[13px]">
                     <span className="font-[500] text-heading">{p.nome}</span>
                     <span className="text-muted">{p.documento ? formatarDocumento(p.documento) : "sem CPF"}</span>
+                    {tipo === "entrada" && (p.nascimento || p.cargo || p.salario !== null) ? (
+                      <span className="basis-full text-[12px] text-muted">
+                        {[
+                          p.nascimento && `nasc. ${isoParaDataBr(p.nascimento)}`,
+                          p.cargo,
+                          p.salario !== null && formatarMoeda(p.salario),
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </span>
+                    ) : null}
                     {p.porQuem === "equipe" ? (
                       <span className="text-[11.5px] text-faint">digitado pela MX</span>
                     ) : null}

@@ -20,7 +20,7 @@ export async function lerMovimentacao(controleId: string): Promise<Movimento[]> 
     const supabase = await clienteServidor();
     const { data, error } = await supabase
       .from("movements")
-      .select("id, kind, full_name, document, source")
+      .select("id, kind, full_name, document, birth_date, job_title, salary, source")
       .eq("control_id", controleId)
       // Entradas antes de saídas, e dentro de cada uma a ordem em que
       // chegaram: é como o gestor digitou, e é como ele vai ler de volta se a

@@ -18,6 +18,8 @@ import { z } from "zod";
 
 import type { DatasDoMes } from "./controle";
 import { cpfValido, limparDocumento } from "./documento";
+import { hojeSaoPaulo } from "./hoje";
+import { dataBrParaIso, valorParaNumero } from "./mascaras";
 import { digitosDoTelefone } from "./telefone";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -164,6 +166,17 @@ export type Movimento = {
   nome: string;
   /** CPF, só dígitos. Nulo quando o gestor não tinha à mão. */
   documento: string | null;
+  /**
+   * Os dados de INCLUSÃO: só a entrada tem.
+   *
+   * A seguradora precisa da idade (prêmio e limite de idade), do cargo (o
+   * capital pode ser por cargo) e do salário (capital em múltiplo salarial)
+   * para incluir alguém. Para excluir, basta saber quem é. Na saída os três são
+   * sempre nulos — e o banco tem um check que garante isso.
+   */
+  nascimento: string | null;
+  cargo: string | null;
+  salario: number | null;
   porQuem: QuemDigitou;
 };
 
@@ -191,7 +204,8 @@ const texto = (valor: unknown) => (typeof valor === "string" ? valor.trim() : ""
 const opcional = (max: number) =>
   z.preprocess(texto, z.string().max(max, `Máximo de ${max} caracteres.`)).transform((v) => v || null);
 
-export const esquemaPessoa = z.object({
+/** Quem SAIU: nome e CPF. É tudo o que a seguradora pede para excluir. */
+export const esquemaSaida = z.object({
   nome: z.preprocess(
     texto,
     z.string().min(3, "Informe o nome completo.").max(120, "Máximo de 120 caracteres."),
@@ -208,6 +222,43 @@ export const esquemaPessoa = z.object({
     (valor) => limparDocumento(texto(valor)),
     z.string().refine((d) => d === "" || cpfValido(d), { message: "CPF inválido." }),
   ).transform((v) => v || null),
+});
+
+/**
+ * Quem ENTROU: nome, CPF, nascimento, cargo e salário (pedido de 06/10).
+ *
+ * Os três novos são opcionais pelo mesmo motivo do CPF: o gestor que não tem o
+ * dado à mão informa o nome e a MX completa. Exigir faria ele inventar um
+ * nascimento para o formulário passar — e o prêmio sairia calculado sobre uma
+ * idade falsa, que ninguém confere depois porque "estava preenchido".
+ */
+export const esquemaEntrada = esquemaSaida.extend({
+  /** Digitado como dd/mm/aaaa; sai em ISO. */
+  nascimento: z.preprocess(
+    texto,
+    z
+      .string()
+      .refine((v) => v === "" || dataBrParaIso(v) !== null, { message: "Data inválida: use dd/mm/aaaa." })
+      // `hojeSaoPaulo` é o único lugar do sistema que lê o relógio, e o
+      // esquema roda nos dois lados — no navegador e na rota. Um nascimento no
+      // futuro é sempre digitação errada.
+      .refine((v) => v === "" || (dataBrParaIso(v) ?? "") <= hojeSaoPaulo(), {
+        message: "A data de nascimento está no futuro.",
+      })
+      .refine((v) => v === "" || (dataBrParaIso(v) ?? "") > "1900-01-01", { message: "Confira o ano." }),
+  ).transform((v) => (v ? dataBrParaIso(v) : null)),
+
+  cargo: opcional(80),
+
+  /** "R$ 3.500,00" ou "3500" — o que vier da máscara ou de uma colagem. */
+  salario: z.preprocess(
+    texto,
+    z
+      .string()
+      .refine((v) => v === "" || valorParaNumero(v) !== null, { message: "Valor inválido." })
+      .refine((v) => v === "" || (valorParaNumero(v) ?? 0) > 0, { message: "O salário precisa ser maior que zero." })
+      .refine((v) => v === "" || (valorParaNumero(v) ?? 0) < 10_000_000, { message: "Confira o valor." }),
+  ).transform((v) => (v ? valorParaNumero(v) : null)),
 });
 
 export const esquemaColeta = z
@@ -229,8 +280,8 @@ export const esquemaColeta = z
     /** O atalho "Ninguém entrou nem saiu". */
     semMovimentacao: z.boolean().default(false),
 
-    entradas: z.array(esquemaPessoa).max(500, "Muitas pessoas para um formulário: envie pela planilha."),
-    saidas: z.array(esquemaPessoa).max(500, "Muitas pessoas para um formulário: envie pela planilha."),
+    entradas: z.array(esquemaEntrada).max(500, "Muitas pessoas para um formulário: envie pela planilha."),
+    saidas: z.array(esquemaSaida).max(500, "Muitas pessoas para um formulário: envie pela planilha."),
 
     /** A ficha do arquivo que o upload já criou. Nulo = não mandou planilha. */
     planilhaId: z.preprocess(
@@ -275,7 +326,23 @@ export type DadosDaColeta = z.infer<typeof esquemaColeta>;
  */
 export function movimentosDaColeta(dados: DadosDaColeta, porQuem: QuemDigitou): Movimento[] {
   return [
-    ...dados.entradas.map((p) => ({ tipo: "entrada" as const, nome: p.nome, documento: p.documento, porQuem })),
-    ...dados.saidas.map((p) => ({ tipo: "saida" as const, nome: p.nome, documento: p.documento, porQuem })),
+    ...dados.entradas.map((p) => ({
+      tipo: "entrada" as const,
+      nome: p.nome,
+      documento: p.documento,
+      nascimento: p.nascimento,
+      cargo: p.cargo,
+      salario: p.salario,
+      porQuem,
+    })),
+    ...dados.saidas.map((p) => ({
+      tipo: "saida" as const,
+      nome: p.nome,
+      documento: p.documento,
+      nascimento: null,
+      cargo: null,
+      salario: null,
+      porQuem,
+    })),
   ];
 }

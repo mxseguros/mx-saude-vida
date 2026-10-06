@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { TopoPagina } from "@/app/_admin/moldura";
 import { lerControle } from "@/lib/controles/consulta";
 import { lerTokenDoMes } from "@/lib/controles/coleta";
+import { lerApoliceAtiva } from "@/lib/clientes/apolice";
+import { perfilAtual } from "@/lib/supabase/servidor";
 import { urlBase } from "@/lib/ambiente";
 import { nomeCurto } from "@/lib/dominio/cliente";
 import { valeAte } from "@/lib/dominio/coleta";
@@ -13,7 +15,7 @@ import { formatarData } from "@/lib/dominio/email";
 
 import { Coleta } from "./coleta";
 
-export const metadata: Metadata = { title: "Coleta da movimentação" };
+export const metadata: Metadata = { title: "Nova coleta de movimentação" };
 
 /**
  * Como a movimentação deste mês vai chegar.
@@ -49,20 +51,21 @@ export default async function PaginaDaColeta({ params }: { params: Promise<{ id:
   if (!controle.dados) notFound();
 
   const linha = controle.dados;
+  const [apolice, eu] = await Promise.all([lerApoliceAtiva(linha.clienteId), perfilAtual()]);
   const cliente = nomeCurto({ razaoSocial: linha.razaoSocial, nomeFantasia: linha.nomeFantasia });
   const hoje = hojeSaoPaulo();
 
   return (
     <>
       <TopoPagina
-        titulo={`Coleta de ${rotuloDaCompetencia(linha.competencia).toLowerCase()}`}
+        titulo="Nova coleta de movimentação"
         contagem={cliente}
         voltar={{ href: "/controle", rotulo: "Voltar para o Controle" }}
       />
 
-      <div className="flex flex-col gap-4 p-4 sm:p-6">
+      <div className="mx-auto flex w-full max-w-[760px] flex-col gap-4 p-4 sm:p-6">
         <p className="text-[13px] text-muted">
-          {linha.seguradora ?? "sem seguradora"}
+          {`${cliente} · ${linha.seguradora ?? "sem seguradora"} · ${rotuloDaCompetencia(linha.competencia).toLowerCase()}`}
           {linha.datas.informar ? ` · informar até ${formatarData(linha.datas.informar)}` : ""}
           {linha.datas.corte ? ` · corte ${formatarData(linha.datas.corte)}` : ""}
         </p>
@@ -70,6 +73,8 @@ export default async function PaginaDaColeta({ params }: { params: Promise<{ id:
         <Coleta
           linha={linha}
           cliente={cliente}
+          apolice={apolice ? `${linha.seguradora ?? "Apólice"} · ${apolice.numero}` : null}
+          analista={eu?.nome ?? "—"}
           /**
            * A URL do link que JÁ existe, montada no servidor.
            *

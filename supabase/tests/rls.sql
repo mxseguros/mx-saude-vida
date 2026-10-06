@@ -417,6 +417,14 @@ select pg_temp.exigir_recusa(
   '23514'
 );
 
+-- Saida nao carrega dado de inclusao (nascimento, cargo, salario).
+select pg_temp.exigir_recusa(
+  $$insert into movements (control_id, kind, full_name, source, salary)
+    values ('c0000000-0000-0000-0000-00000000000b', 'exit', 'Pessoa Que Saiu', 'staff', 1000)$$,
+  'saida aceitou salario',
+  '23514'
+);
+
 -- Tirar o link e tirar os dois campos, e isso tem que passar.
 update monthly_controls
    set collection_token = null, collection_expires_at = null

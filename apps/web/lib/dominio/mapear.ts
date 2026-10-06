@@ -139,6 +139,9 @@ export type LinhaMovimento = {
   kind: string;
   full_name: string;
   document: string | null;
+  birth_date?: string | null;
+  job_title?: string | null;
+  salary?: string | number | null;
   source: string;
 };
 
@@ -156,6 +159,10 @@ export function paraMovimento(linha: LinhaMovimento): Movimento {
     tipo: linha.kind === "exit" ? "saida" : "entrada",
     nome: linha.full_name,
     documento: linha.document,
+    nascimento: linha.birth_date ?? null,
+    cargo: linha.job_title ?? null,
+    // `numeric` chega como texto pelo PostgREST.
+    salario: linha.salary === null || linha.salary === undefined ? null : Number(linha.salary),
     porQuem: linha.source === "manager" ? "gestor" : "equipe",
   };
 }

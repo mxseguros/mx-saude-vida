@@ -193,3 +193,37 @@ export const mascararInteiro: Mascara = (entrada) => {
   if (!digitos) return negativo ? "-" : "";
   return (negativo ? "-" : "") + digitos;
 };
+
+/* --------------------------------------------------------------------------
+   Data
+   -------------------------------------------------------------------------- */
+
+/** Progressiva: "1", "12/", "12/0", "12/03/1990". */
+export const mascararData: Mascara = (entrada) => {
+  const d = entrada.replace(/\D/g, "").slice(0, 8);
+  if (d.length <= 2) return d;
+  if (d.length <= 4) return `${d.slice(0, 2)}/${d.slice(2)}`;
+  return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}`;
+};
+
+/**
+ * "12/03/1990" -> "1990-03-12". `null` para o que não for uma data de verdade.
+ *
+ * "31/02/1990" é recusado, e não convertido para 3 de março como o `Date` do
+ * JavaScript faria: nascimento que muda de mês sozinho é idade errada no
+ * prêmio, e ninguém repararia.
+ */
+export function dataBrParaIso(entrada: string): string | null {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(entrada.trim());
+  if (!m) return null;
+  const [dia, mes, ano] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const data = new Date(Date.UTC(ano, mes - 1, dia));
+  if (data.getUTCFullYear() !== ano || data.getUTCMonth() !== mes - 1 || data.getUTCDate() !== dia) return null;
+  return `${m[3]}-${m[2]}-${m[1]}`;
+}
+
+/** "1990-03-12" -> "12/03/1990". Vazio para o que não for ISO. */
+export function isoParaDataBr(iso: string | null | undefined): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso ?? "");
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : "";
+}
