@@ -21,7 +21,8 @@ export type ColunaDaPlanilha =
   | "capital"
   | "setor"
   | "gestor"
-  | "admissao";
+  | "admissao"
+  | "salario";
 
 /**
  * Como cada coluna pode estar escrita.
@@ -42,6 +43,7 @@ const SINONIMOS: Record<ColunaDaPlanilha, readonly string[]> = {
   setor: ["setor", "departamento", "area", "centro de custo"],
   gestor: ["gestor", "gestor responsavel", "responsavel", "lider"],
   admissao: ["admissao", "data admissao", "desde", "data de admissao", "dt admissao"],
+  salario: ["salario", "salario base", "remuneracao", "salario mensal"],
 };
 
 /** As que, faltando, impedem conferir a linha. O resto é informativo. */
@@ -56,6 +58,7 @@ export const ROTULO_COLUNA: Record<ColunaDaPlanilha, string> = {
   setor: "Setor",
   gestor: "Gestor",
   admissao: "Admissão",
+  salario: "Salário",
 };
 
 export type Celula = string | number | Date | null | undefined;
@@ -149,6 +152,7 @@ export type LinhaDaPlanilha = {
   setor: string | null;
   gestor: string | null;
   admissao: string | null;
+  salario: number | null;
   problemas: ProblemaDaLinha[];
 };
 
@@ -267,6 +271,12 @@ export function lerLinhaDaPlanilha(
     problemas.push({ campo: "admissao", tipo: "invalido", mensagem: "Admissão não é uma data." });
   }
 
+  const salarioBruto = pegar("salario");
+  const salario = lerValor(salarioBruto);
+  if (colunas.salario !== undefined && texto(salarioBruto) && salario === null) {
+    problemas.push({ campo: "salario", tipo: "invalido", mensagem: "Salário não é um número." });
+  }
+
   const capitalBruto = pegar("capital");
   const capital = lerValor(capitalBruto);
   if (colunas.capital !== undefined && texto(capitalBruto) && capital === null) {
@@ -285,6 +295,7 @@ export function lerLinhaDaPlanilha(
     setor: texto(pegar("setor")) || null,
     gestor: texto(pegar("gestor")) || null,
     admissao,
+    salario,
     problemas,
   };
 }

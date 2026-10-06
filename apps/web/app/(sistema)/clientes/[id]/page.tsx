@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { TopoPagina } from "@/app/_admin/moldura";
+import { LinkBotao } from "@/componentes/ui/botao";
 import { lerCliente, listarAcervo, listarBoletos, listarSeguradoras } from "@/lib/clientes/consulta";
 import { nomeCurto } from "@/lib/dominio/cliente";
 import { lerApoliceAtiva } from "@/lib/clientes/apolice";
@@ -51,6 +52,11 @@ export default async function PaginaCliente({ params }: { params: Promise<{ id: 
       <TopoPagina
         titulo={nomeCurto(cliente.dados)}
         voltar={{ href: "/clientes", rotulo: "Voltar para Clientes" }}
+        acoes={
+          <LinkBotao href={`/clientes/${id}/funcionarios`} variante="secundario">
+            Funcionários
+          </LinkBotao>
+        }
       />
 
       <div className="p-4 sm:p-6">

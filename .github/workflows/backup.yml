@@ -239,7 +239,7 @@ jobs:
       # ele nao passa e por esta conferencia.
       - name: Conferir as contagens
         run: |
-          TABELAS="clients insurers monthly_controls control_events messages message_templates client_files movements profiles policies retention_rules"
+          TABELAS="clients insurers monthly_controls control_events messages message_templates client_files movements employees profiles policies retention_rules"
           FALHOU=0
 
           for T in $TABELAS; do

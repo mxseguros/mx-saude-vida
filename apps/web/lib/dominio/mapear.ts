@@ -9,6 +9,7 @@ import type { Passo } from "./controle";
 import type { Canal } from "./mensagem";
 import type { ModeloDeMensagem } from "./controle";
 import type { Movimento, QuemDigitou, TipoDeMovimento } from "./coleta";
+import type { Funcionario } from "./funcionario";
 import type { Papel, Pessoa } from "./tipos";
 
 /* --------------------------------------------------------------------------
@@ -173,4 +174,54 @@ export function deTipoDeMovimento(tipo: TipoDeMovimento): "entry" | "exit" {
 
 export function deQuemDigitou(quem: QuemDigitou): "manager" | "staff" {
   return quem === "gestor" ? "manager" : "staff";
+}
+
+/* --------------------------------------------------------------------------
+   Funcionário: `employees` no banco
+   -------------------------------------------------------------------------- */
+
+export type LinhaFuncionario = {
+  id: string;
+  full_name: string;
+  document: string | null;
+  birth_date: string | null;
+  job_title: string | null;
+  salary: string | number | null;
+  sector: string | null;
+  manager_name: string | null;
+  hired_at: string | null;
+  dismissed_at: string | null;
+  dismissal_reason: string | null;
+};
+
+export const COLUNAS_FUNCIONARIO =
+  "id, full_name, document, birth_date, job_title, salary, sector, manager_name, hired_at, dismissed_at, dismissal_reason";
+
+export function paraFuncionario(l: LinhaFuncionario): Funcionario {
+  return {
+    id: l.id,
+    nome: l.full_name,
+    documento: l.document,
+    nascimento: l.birth_date,
+    cargo: l.job_title,
+    salario: l.salary === null ? null : Number(l.salary),
+    setor: l.sector,
+    gestor: l.manager_name,
+    admissao: l.hired_at,
+    saida: l.dismissed_at,
+    motivo: l.dismissal_reason,
+  };
+}
+
+export function deFuncionario(d: Omit<Funcionario, "id" | "saida" | "motivo">) {
+  return {
+    full_name: d.nome,
+    document: d.documento,
+    birth_date: d.nascimento,
+    job_title: d.cargo,
+    salary: d.salario,
+    sector: d.setor,
+    manager_name: d.gestor,
+    hired_at: d.admissao,
+  };
 }

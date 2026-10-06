@@ -199,7 +199,7 @@ describe("a planilha inteira", () => {
     expect(p.total).toBe(3);
     expect(p.comProblema).toBe(1);
     expect(p.cabecalho?.linha).toBe(1);
-    expect(p.colunasAusentes).toEqual(["setor", "gestor", "admissao"]);
+    expect(p.colunasAusentes).toEqual(["setor", "gestor", "admissao", "salario"]);
   });
 
   /**

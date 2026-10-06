@@ -27,6 +27,7 @@ function naPlanilha(troca: Partial<LinhaDaPlanilha> = {}): LinhaDaPlanilha {
     setor: null,
     gestor: null,
     admissao: "2026-09-01",
+    salario: null,
     problemas: [],
     ...troca,
   };

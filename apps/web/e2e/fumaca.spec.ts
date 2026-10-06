@@ -22,6 +22,7 @@ const PROTEGIDAS = [
   "/controle/00000000-0000-0000-0000-000000000000/coleta",
   "/clientes",
   "/clientes/novo",
+  "/clientes/00000000-0000-0000-0000-000000000000/funcionarios",
   "/configuracoes",
 ];
 
@@ -140,6 +141,28 @@ test.describe("apólice do cliente", () => {
   test("salvar a apólice exige sessão", async ({ request }) => {
     const resposta = await request.put(`/api/v1/clientes/${CLIENTE}/apolice`, { multipart: { dados: "{}" } });
     expect([401, 503]).toContain(resposta.status());
+  });
+});
+
+/** CPF, nascimento e salário de cada vida: tudo exige sessão. */
+test.describe("funcionários", () => {
+  const BASE = "/api/v1/clientes/00000000-0000-0000-0000-000000000000/funcionarios";
+  const ID = "00000000-0000-0000-0000-000000000000";
+
+  test("adicionar exige sessão", async ({ request }) => {
+    expect([401, 503]).toContain((await request.post(BASE, { data: { nome: "Quem Tentou" } })).status());
+  });
+  test("editar exige sessão", async ({ request }) => {
+    expect([401, 503]).toContain((await request.patch(`${BASE}/${ID}`, { data: { nome: "Quem Tentou" } })).status());
+  });
+  test("demitir exige sessão", async ({ request }) => {
+    expect([401, 503]).toContain((await request.post(`${BASE}/${ID}/demissao`, { data: { saida: "01/01/2026" } })).status());
+  });
+  test("importar exige sessão", async ({ request }) => {
+    const r = await request.post(`${BASE}/importacao`, {
+      multipart: { arquivo: { name: "f.csv", mimeType: "text/csv", buffer: Buffer.from("nome;cpf") } },
+    });
+    expect([401, 503]).toContain(r.status());
   });
 });
 

@@ -106,6 +106,10 @@ export async function aplicarRetencao(
  */
 async function limparMovimentacao(supabase: ReturnType<typeof clienteAdministrador>): Promise<number> {
   try {
+    // Funcionários demitidos há mais que o prazo saem junto: mesmo dado, mesmo prazo.
+    const { error: erroFuncionarios } = await supabase.rpc("limpar_funcionarios_vencidos");
+    if (erroFuncionarios) registrarLog("erro", "retencao.funcionarios", { codigo: erroFuncionarios.code });
+
     const { data, error } = await supabase.rpc("limpar_movimentacao_vencida");
 
     if (error) {

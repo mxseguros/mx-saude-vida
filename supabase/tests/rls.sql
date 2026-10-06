@@ -75,6 +75,10 @@ update monthly_controls
        manager_sector        = 'Producao'
  where id = 'c0000000-0000-0000-0000-00000000000a';
 
+insert into employees (id, client_id, full_name, document, hired_at)
+values ('e0000000-0000-0000-0000-00000000000a', 'a0000000-0000-0000-0000-000000000001',
+        'Funcionaria Teste', '99999999050', date '2025-01-01');
+
 insert into movements (control_id, kind, full_name, document, source)
 values
   ('c0000000-0000-0000-0000-00000000000a', 'entry', 'Pessoa Que Entrou', '99999999901', 'manager'),
@@ -139,6 +143,7 @@ select pg_temp.exigir((select count(*) from clients) = 0, 'anonimo enxergou clie
 select pg_temp.exigir((select count(*) from profiles) = 0, 'anonimo enxergou a equipe');
 select pg_temp.exigir((select count(*) from monthly_controls) = 0, 'anonimo enxergou o controle');
 select pg_temp.exigir((select count(*) from movements) = 0, 'anonimo enxergou quem entrou e quem saiu');
+select pg_temp.exigir((select count(*) from employees) = 0, 'anonimo enxergou funcionarios');
 select pg_temp.exigir((select count(*) from client_files) = 0, 'anonimo enxergou arquivos');
 select pg_temp.exigir((select count(*) from messages) = 0, 'anonimo enxergou mensagens');
 select pg_temp.exigir((select count(*) from message_templates) = 0, 'anonimo enxergou os modelos de mensagem');
@@ -191,6 +196,23 @@ select pg_temp.exigir_recusa(
   $$update ai_runs set cost_brl = 0 where profile_id = '11111111-1111-1111-1111-111111111111'$$,
   'analista reescreveu o custo da IA'
 );
+
+-- Mesmo CPF ativo duas vezes no cliente e a mesma vida cobrada em dobro.
+select pg_temp.exigir_recusa(
+  $$insert into employees (client_id, full_name, document)
+    values ('a0000000-0000-0000-0000-000000000001', 'Copia', '99999999050')$$,
+  'aceitou o mesmo CPF ativo duas vezes',
+  '23505'
+);
+-- Demitida, o mesmo CPF pode voltar: readmissao e uma linha nova.
+update employees set dismissed_at = date '2026-09-30' where id = 'e0000000-0000-0000-0000-00000000000a';
+insert into employees (client_id, full_name, document, hired_at)
+values ('a0000000-0000-0000-0000-000000000001', 'Funcionaria Teste', '99999999050', date '2026-10-01');
+-- Excluir de vez e do administrador.
+with removido as (
+  delete from employees where id = 'e0000000-0000-0000-0000-00000000000a' returning 1
+)
+select pg_temp.exigir((select count(*) from removido) = 0, 'analista excluiu funcionario de vez');
 
 -- Reenvio do gestor refaz o que ELE informou: as linhas de `manager` saem e as
 -- novas entram. O que o gestor mandou antes fica na linha do tempo, que e
@@ -289,6 +311,11 @@ select pg_temp.exigir_recusa(
   'perfil de leitura digitou movimentacao'
 );
 
+with alterado as (
+  update employees set dismissed_at = current_date where id = 'e0000000-0000-0000-0000-00000000000a' returning 1
+)
+select pg_temp.exigir((select count(*) from alterado) = 0, 'perfil de leitura demitiu funcionario');
+
 select pg_temp.exigir_recusa(
   $$insert into ai_runs (agent, model, profile_id) values ('apolice', 'teste', '44444444-4444-4444-4444-444444444444')$$,
   'perfil de leitura gastou com IA'
@@ -323,6 +350,7 @@ select pg_temp.exigir((select count(*) from clients) = 0, 'conta sem perfil enxe
 select pg_temp.exigir((select count(*) from monthly_controls) = 0, 'conta sem perfil enxergou o controle');
 select pg_temp.exigir((select count(*) from client_files) = 0, 'conta sem perfil enxergou arquivos');
 select pg_temp.exigir((select count(*) from movements) = 0, 'conta sem perfil enxergou a movimentacao');
+select pg_temp.exigir((select count(*) from employees) = 0, 'conta sem perfil enxergou funcionarios');
 select pg_temp.exigir((select count(*) from messages) = 0, 'conta sem perfil enxergou mensagens');
 select pg_temp.exigir((select count(*) from control_events) = 0, 'conta sem perfil enxergou a linha do tempo');
 select pg_temp.exigir((select count(*) from v_control_board) = 0, 'conta sem perfil enxergou a view do controle');
@@ -410,6 +438,11 @@ select pg_temp.exigir_recusa(
 -- As duas funcoes de retencao sao `security definer` e apagam dado pessoal.
 -- Regra 7: `revoke` de anon e authenticated. Quem chama e o cron, com a chave
 -- de servico — nao a interface.
+select pg_temp.exigir_recusa(
+  $$select limpar_funcionarios_vencidos()$$,
+  'usuario comum apagou funcionarios'
+);
+
 select pg_temp.exigir_recusa(
   $$select limpar_movimentacao_vencida()$$,
   'usuario comum apagou a movimentacao de todo mundo'
