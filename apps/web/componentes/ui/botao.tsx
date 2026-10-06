@@ -14,7 +14,7 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
  */
 
 type Variante = "primario" | "secundario" | "suave" | "whatsapp" | "perigo" | "texto";
-type Tamanho = "normal" | "grande";
+type Tamanho = "normal" | "grande" | "compacto";
 
 type Props = ButtonHTMLAttributes<HTMLButtonElement> & {
   variante?: Variante;
@@ -46,6 +46,8 @@ const TAMANHOS: Record<Tamanho, string> = {
   // 40px, que e a altura do prototipo para mouse.
   normal: "h-11 px-4 text-[14px] sm:h-10",
   grande: "h-[46px] px-6 text-[15px]",
+  // A coluna "Próximo passo" do Controle: todos os botões da linha do mesmo tamanho.
+  compacto: "h-8 px-2.5 text-[12px]",
 };
 
 export function Botao({

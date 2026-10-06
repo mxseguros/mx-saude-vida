@@ -76,7 +76,7 @@ export function MarcarPago({
         <Botao
           variante="primario"
           onClick={() => setAberto(true)}
-          className="min-h-[32px] px-2.5 text-[12px] sm:min-h-[32px]"
+          tamanho="compacto"
         >
           {rotulo}
         </Botao>

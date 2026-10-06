@@ -62,7 +62,7 @@ export function Acoes({ linha, modelos }: { linha: LinhaDoControle; modelos: Mod
     return (
       <a
         href={`/controle/${linha.id}/coleta`}
-        className="inline-flex min-h-[32px] items-center rounded-[6px] bg-brand px-2.5 text-[12px] font-[600] text-on-brand hover:bg-brand-hover"
+        className="inline-flex h-8 items-center whitespace-nowrap rounded-[6px] font-(family-name:--font-display) bg-brand px-2.5 text-[12px] font-[600] text-on-brand hover:bg-brand-hover"
       >
         {passo.rotulo}
       </a>
@@ -73,7 +73,7 @@ export function Acoes({ linha, modelos }: { linha: LinhaDoControle; modelos: Mod
     return (
       <a
         href={`/controle/${linha.id}/conferir`}
-        className="inline-flex min-h-[32px] items-center rounded-[6px] border border-line-strong px-2.5 text-[12px] font-[600] text-heading hover:bg-surface-2"
+        className="inline-flex h-8 items-center whitespace-nowrap rounded-[6px] font-(family-name:--font-display) border border-line-strong px-2.5 text-[12px] font-[600] text-heading hover:bg-surface-2"
       >
         {passo.rotulo}
       </a>
@@ -160,7 +160,7 @@ export function Acoes({ linha, modelos }: { linha: LinhaDoControle; modelos: Mod
         <Botao
           variante={linha.passo === "informar" ? "primario" : "secundario"}
           onClick={abrir}
-          className="min-h-[32px] px-2.5 text-[12px] sm:min-h-[32px]"
+          tamanho="compacto"
         >
           {passo.rotulo}
         </Botao>

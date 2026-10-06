@@ -162,7 +162,7 @@ export function AnexarBoleto({
           limpar();
           setAberto(true);
         }}
-        className={grande ? "" : "min-h-[32px] px-2.5 text-[12px] sm:min-h-[32px]"}
+        tamanho={grande ? "normal" : "compacto"}
       >
         {rotulo}
       </Botao>
