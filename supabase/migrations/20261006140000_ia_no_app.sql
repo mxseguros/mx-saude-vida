@@ -4,22 +4,12 @@
 -- colunas que nao existem aqui e chamava `gasto_ia_do_dia`, que nao existia.
 -- Toda gravacao falhava em silencio (o registro nunca lanca), o cache nunca
 -- achava nada e o teto diario respondia "esgotado" sempre. O agente da apolice
--- so tinha sido provado por script.
+-- so tinha sido provado por script. As politicas de insert e update ja
+-- existiam desde a migration de RLS; o que faltava era o resto.
 
 alter table ai_runs add column if not exists input_summary text;
 
--- A equipe que ESCREVE registra a propria execucao. Assinar por outra pessoa
--- burlaria o teto diario, que e por pessoa.
-create policy ai_runs_insert on ai_runs
-  for insert to authenticated
-  with check (can_write() and profile_id = auth.uid());
-
 -- So o aceite muda depois: a saida do modelo e o custo sao livro-caixa.
-create policy ai_runs_update on ai_runs
-  for update to authenticated
-  using (can_write())
-  with check (can_write());
-
 revoke update on ai_runs from authenticated;
 grant update (accepted) on ai_runs to authenticated;
 
