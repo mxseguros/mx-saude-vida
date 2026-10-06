@@ -12,7 +12,7 @@ Leia este arquivo primeiro ao retomar. Os planos longos ficam para consulta pont
 - Alertas (`/alertas`) e sino no menu com atrasados + hoje; somem quando a ação é registrada. Sem filtro por analista e sem aviso diário (decisão de 06/10).
 - Ficha do cliente em abas (`?aba=`): Cadastro e apólice · Funcionários (base de vidas, demitir/readmitir, importar, capital pela apólice) · Movimentações · Boletos.
 - 5ª data "Confirmar emissão" (opcional por cliente): atividade no Controle, Alertas e agenda, botão Confirmar.
-- 429 testes, 89 provas Playwright, RLS e CI verdes.
+- 429 testes, 90 provas Playwright, RLS e CI verdes.
 
 ## Direção
 
