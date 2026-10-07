@@ -1,7 +1,7 @@
 import "server-only";
 
 import { clienteServidor } from "../supabase/servidor";
-import { dePasso, deModelo } from "../dominio/mapear";
+import { dePasso, deModelo, paraModelo } from "../dominio/mapear";
 import {
   aplicarAcao,
   datasDaCompetencia,
@@ -295,9 +295,29 @@ export async function registrarMensagem(
   autor: string | null,
   falhou?: string | null,
   cliente?: Cliente,
+  assunto?: string | null,
 ): Promise<ResultadoEscrita<{ id: number }>> {
   try {
     const supabase = cliente ?? (await clienteServidor());
+
+    // A mensagem preparada pela rotina (pendente) do mesmo mês, tipo e canal é
+    // ESTA que está saindo agora: concluí-la, e não gravar uma segunda, é o que
+    // tira o item da fila "Mensagens para enviar".
+    if (!falhou) {
+      const { data: pendente } = await supabase
+        .from("messages")
+        .select("id")
+        .eq("control_id", controleId)
+        .eq("kind", deModelo(modelo))
+        .eq("channel", canal)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (pendente) {
+        return concluirMensagem((pendente as { id: number }).id, autor, { destino, corpo, assunto }, supabase);
+      }
+    }
 
     const { data, error } = await supabase
       .from("messages")
@@ -306,6 +326,7 @@ export async function registrarMensagem(
         kind: deModelo(modelo),
         channel: canal,
         to_address: destino,
+        subject: assunto ?? null,
         body: corpo,
         status: falhou ? "failed" : "sent",
         sent_by: autor,
@@ -321,20 +342,124 @@ export async function registrarMensagem(
 
     // A falha não vira "última mensagem": a coluna do Controle mostra o que
     // chegou ao cliente, não o que se tentou.
-    if (!falhou) {
-      await supabase.from("monthly_controls").update({ last_message_id: id }).eq("id", controleId);
-      await supabase.from("control_events").insert({
-        control_id: controleId,
-        type: "message",
-        origin: autor ? "staff" : "system",
-        actor_profile_id: autor,
-        note: `Mensagem enviada por ${canal === "email" ? "e-mail" : "WhatsApp"} para ${destino}.`,
-        payload: { kind: deModelo(modelo), channel: canal },
-      });
-    }
+    if (!falhou) await anotarEnvio(supabase, controleId, id, canal, destino, modelo, autor);
 
     return { ok: true, dados: { id } };
   } catch {
     return { ok: false, falha: falhaGenerica() };
   }
+}
+
+/**
+ * Deixa a mensagem PRONTA na fila, sem enviar: o e-mail abre no Outlook e o
+ * WhatsApp no `wa.me` quando a analista clica (decisão de 07/10).
+ */
+export async function prepararMensagem(
+  controleId: string,
+  modelo: ModeloDeMensagem,
+  canal: "email" | "whatsapp",
+  destino: string,
+  assunto: string | null,
+  corpo: string,
+  cliente?: Cliente,
+): Promise<ResultadoEscrita<{ id: number }>> {
+  try {
+    const supabase = cliente ?? (await clienteServidor());
+    const { data, error } = await supabase
+      .from("messages")
+      .insert({
+        control_id: controleId,
+        kind: deModelo(modelo),
+        channel: canal,
+        to_address: destino,
+        subject: assunto,
+        body: corpo,
+        status: "pending",
+        sent_by: null,
+        sent_at: null,
+      })
+      .select("id")
+      .single();
+    if (error || !data) return { ok: false, falha: falhaGenerica() };
+    return { ok: true, dados: { id: (data as { id: number }).id } };
+  } catch {
+    return { ok: false, falha: falhaGenerica() };
+  }
+}
+
+/**
+ * Pendente → enviada: a analista abriu o Outlook ou o WhatsApp com ela.
+ * Vira evento na linha do tempo; sem o evento, a mensagem volta a pendente.
+ */
+export async function concluirMensagem(
+  id: number,
+  autor: string | null,
+  ajuste: { destino?: string; corpo?: string; assunto?: string | null } = {},
+  cliente?: Cliente,
+): Promise<ResultadoEscrita<{ id: number }>> {
+  try {
+    const supabase = cliente ?? (await clienteServidor());
+    const mudanca: Record<string, unknown> = { status: "sent", sent_by: autor, sent_at: new Date().toISOString() };
+    if (ajuste.destino) mudanca.to_address = ajuste.destino;
+    if (ajuste.corpo) mudanca.body = ajuste.corpo;
+    if (ajuste.assunto) mudanca.subject = ajuste.assunto;
+
+    const { data, error } = await supabase
+      .from("messages")
+      .update(mudanca)
+      .eq("id", id)
+      .eq("status", "pending")
+      .select("id, control_id, kind, channel, to_address")
+      .maybeSingle();
+
+    if (error) return { ok: false, falha: falhaGenerica() };
+    if (!data) {
+      return {
+        ok: false,
+        falha: { status: 409, codigo: "ja_enviada", mensagem: "Esta mensagem já foi enviada. Atualize a página." },
+      };
+    }
+
+    const m = data as { control_id: string; kind: string; channel: "email" | "whatsapp"; to_address: string };
+    const evento = await anotarEnvio(supabase, m.control_id, id, m.channel, m.to_address, paraModelo(m.kind), autor);
+    if (!evento) {
+      await supabase.from("messages").update({ status: "pending", sent_by: null, sent_at: null }).eq("id", id);
+      return {
+        ok: false,
+        falha: {
+          status: 503,
+          codigo: "evento_falhou",
+          mensagem: "O envio foi desfeito porque não consegui registrá-lo no histórico.",
+        },
+      };
+    }
+    return { ok: true, dados: { id } };
+  } catch {
+    return { ok: false, falha: falhaGenerica() };
+  }
+}
+
+/** Última mensagem do mês + evento na linha do tempo. Devolve se o evento gravou. */
+async function anotarEnvio(
+  supabase: Cliente,
+  controleId: string,
+  id: number,
+  canal: "email" | "whatsapp",
+  destino: string,
+  modelo: ModeloDeMensagem,
+  autor: string | null,
+): Promise<boolean> {
+  await supabase.from("monthly_controls").update({ last_message_id: id }).eq("id", controleId);
+  const { error } = await supabase.from("control_events").insert({
+    control_id: controleId,
+    type: "message",
+    origin: autor ? "staff" : "system",
+    actor_profile_id: autor,
+    note:
+      canal === "email"
+        ? `E-mail aberto no Outlook para ${destino}.`
+        : `Mensagem aberta no WhatsApp para ${destino}.`,
+    payload: { kind: deModelo(modelo), channel: canal },
+  });
+  return !error;
 }

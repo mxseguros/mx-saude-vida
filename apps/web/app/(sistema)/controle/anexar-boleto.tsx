@@ -138,9 +138,7 @@ export function AnexarBoleto({
       const envio = json?.data?.envio as { email: boolean; whatsapp: boolean; aviso: string | null } | undefined;
       aviso.mostrar(
         envio?.aviso ??
-          (envio?.email
-            ? `Boleto de ${cliente} anexado e enviado por e-mail, com o PDF em anexo.`
-            : `Boleto de ${cliente} anexado.`),
+          `Boleto de ${cliente} anexado.`,
       );
       setAberto(false);
       limpar();
@@ -179,7 +177,7 @@ export function AnexarBoleto({
               Cancelar
             </Botao>
             <Botao onClick={salvar} disabled={salvando || !pronto}>
-              {salvando ? "Salvando…" : "Salvar e avisar o cliente"}
+              {salvando ? "Salvando…" : "Salvar boleto"}
             </Botao>
           </>
         }
@@ -307,9 +305,8 @@ export function AnexarBoleto({
           ) : null}
 
           <p className="rounded-[8px] bg-surface-2 px-3 py-2.5 text-[12.5px] leading-relaxed text-texto">
-            Ao salvar, o boleto fica na aba Boletos do cliente e a movimentação avança. A mensagem de boleto
-            sai na hora pelo canal dele: por e-mail, com o PDF em anexo; por WhatsApp, fica pronta para você abrir
-            no botão da linha.
+            Ao salvar, o boleto fica na aba Boletos do cliente e a movimentação avança. A mensagem de boleto fica
+            pronta em Alertas › Mensagens para enviar: você abre no Outlook (o PDF baixa junto) ou no WhatsApp.
           </p>
 
           <Aviso estado={aviso.estado} onFechar={aviso.fechar} />

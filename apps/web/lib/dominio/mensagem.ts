@@ -189,6 +189,37 @@ export function linkWhatsapp(telefone: string | null | undefined, texto: string)
 }
 
 /* --------------------------------------------------------------------------
+   E-mail pelo Outlook de quem envia
+   -------------------------------------------------------------------------- */
+
+/** O Windows corta link de protocolo perto de 2.000 caracteres; acima, o Outlook abre vazio. */
+export const LIMITE_DO_MAILTO = 1900;
+
+/**
+ * O link que abre o programa de e-mail do computador (o Outlook) com a
+ * mensagem pronta. Quebra de linha como CRLF, que é o que o Outlook respeita.
+ * O texto é cortado com "…" para o link inteiro caber no limite.
+ * `null` para endereço sem `@`: abrir um e-mail para ninguém não ajuda.
+ */
+export function linkEmail(para: string | null | undefined, assunto: string, texto: string): string | null {
+  const endereco = (para ?? "").trim();
+  if (!/^[^\s@]+@[^\s@]+$/.test(endereco)) return null;
+
+  const montar = (corpo: string) =>
+    `mailto:${encodeURIComponent(endereco)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(
+      corpo.replace(/\r?\n/g, "\r\n"),
+    )}`;
+
+  let corpo = texto;
+  let link = montar(corpo);
+  while (link.length > LIMITE_DO_MAILTO && corpo.length > 0) {
+    corpo = corpo.slice(0, Math.max(0, corpo.length - Math.ceil((link.length - LIMITE_DO_MAILTO) / 3) - 1));
+    link = montar(`${corpo}…`);
+  }
+  return link;
+}
+
+/* --------------------------------------------------------------------------
    Canal
    -------------------------------------------------------------------------- */
 

@@ -6,6 +6,11 @@ import { LinkBotao } from "@/componentes/ui/botao";
 import { lerAlertas } from "@/lib/alertas/consulta";
 import { ROTULO_GRUPO, type GrupoDeAlerta } from "@/lib/dominio/alerta";
 import { hojeSaoPaulo } from "@/lib/dominio/hoje";
+import { rotuloDaCompetencia } from "@/lib/dominio/controle";
+import { ROTULO_MODELO } from "@/lib/dominio/mensagem";
+import { listarPendentes } from "@/lib/mensagens/pendentes";
+
+import { EnviarPendente } from "./enviar-pendente";
 
 export const metadata: Metadata = { title: "Alertas de prazo" };
 
@@ -13,7 +18,7 @@ const MARCA: Record<GrupoDeAlerta, string> = { atrasado: "!", hoje: "●", perto
 
 export default async function PaginaAlertas() {
   const hoje = hojeSaoPaulo();
-  const alertas = await lerAlertas(hoje);
+  const [alertas, pendentes] = await Promise.all([lerAlertas(hoje), listarPendentes()]);
   const grupos: GrupoDeAlerta[] = ["atrasado", "hoje", "perto", "validar"];
 
   return (
@@ -24,6 +29,42 @@ export default async function PaginaAlertas() {
           Gerados das Regras do mês de cada cliente: o dia de compartilhar o link, o corte, o boleto e o vencimento.
           Somem quando a ação é registrada.
         </p>
+
+        {/* A fila: mensagens que a rotina ou o boleto deixaram prontas. Nada sai
+            sem a analista clicar (decisão de 07/10). */}
+        {pendentes.dados.length ? (
+          <section aria-labelledby="grupo-enviar" className="flex flex-col gap-2">
+            <h2 id="grupo-enviar" className="m-0 text-[11.5px] font-[700] uppercase tracking-[.08em] text-brand">
+              Mensagens para enviar · {pendentes.dados.length}
+            </h2>
+            <ul className="m-0 flex list-none flex-col gap-2 p-0">
+              {pendentes.dados.map((m) => (
+                <li
+                  key={m.id}
+                  className="flex flex-wrap items-center gap-3 rounded-[10px] border border-line bg-surface px-3.5 py-3"
+                >
+                  <div className="flex min-w-0 flex-1 flex-col">
+                    <b className="break-words text-[13.5px] font-[600] text-heading">
+                      {ROTULO_MODELO[m.modelo]} · {m.cliente}
+                    </b>
+                    <span className="break-words text-[12.5px] text-muted">
+                      {m.canal === "email" ? "E-mail" : "WhatsApp"} para {m.destino} ·{" "}
+                      {rotuloDaCompetencia(m.competencia).toLowerCase()}
+                    </span>
+                  </div>
+                  <EnviarPendente
+                    id={m.id}
+                    canal={m.canal}
+                    destino={m.destino}
+                    assunto={m.assunto}
+                    corpo={m.corpo}
+                    boletoArquivoId={m.boletoArquivoId}
+                  />
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
 
         {alertas.erro ? (
           <p role="alert" className="rounded-[8px] border border-warn bg-warn-soft p-3 text-[13.5px] text-texto">

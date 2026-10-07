@@ -9,6 +9,7 @@ import { Aviso, useAviso } from "@/componentes/ui/aviso";
 import { proximoPasso, ROTULO_PASSO } from "@/lib/dominio/controle";
 import {
   canaisPossiveis,
+  linkEmail,
   linkWhatsapp,
   montarMensagem,
   ROTULO_CANAL,
@@ -16,6 +17,8 @@ import {
 } from "@/lib/dominio/mensagem";
 import { nomeCurto } from "@/lib/dominio/cliente";
 import type { LinhaDoControle, ModeloSalvo } from "@/lib/controles/consulta";
+
+import { abrirNoOutlook, abrirNoWhatsapp, baixarArquivo } from "@/componentes/abrir-mensagem";
 
 import { AnexarBoleto } from "./anexar-boleto";
 import { MarcarPago } from "./marcar-pago";
@@ -84,9 +87,8 @@ export function Acoes({ linha, modelos }: { linha: LinhaDoControle; modelos: Mod
   const canais = canaisPossiveis(linha.canal, { celular: linha.gestorCelular, email: linha.gestorEmail });
   const semDestino = !canais.whatsapp && !canais.email;
 
-  function montarTexto(): string {
-    if (!modeloSalvo) return "";
-    return montarMensagem(modeloSalvo.corpo, {
+  function contexto() {
+    return {
       cliente,
       gestor: linha.gestorNome,
       competencia: linha.competencia,
@@ -95,10 +97,16 @@ export function Acoes({ linha, modelos }: { linha: LinhaDoControle; modelos: Mod
       dataBoleto: linha.datas.boleto,
       dataVencimento: linha.datas.vencimento,
       valorDoBoleto: linha.valorDoBoleto,
-      link: typeof window === "undefined" ? "" : `${window.location.origin}/portal`,
+      // Nas etapas desta janela (corte, boleto, vencimento) não há link a
+      // mandar: o de coleta vai na etapa "Enviar link".
+      link: "",
       seguradora: linha.seguradora,
       analista: linha.analista,
-    });
+    };
+  }
+
+  function montarTexto(): string {
+    return modeloSalvo ? montarMensagem(modeloSalvo.corpo, contexto()) : "";
   }
 
   function abrir() {
@@ -123,7 +131,9 @@ export function Acoes({ linha, modelos }: { linha: LinhaDoControle; modelos: Mod
 
       aviso.mostrar(
         canal === "email"
-          ? `E-mail enviado para ${linha.gestorEmail}.`
+          ? comPdf
+            ? "Registrado. Arraste o PDF baixado para o e-mail no Outlook e clique em Enviar."
+            : "Registrado. Revise e clique em Enviar no Outlook que abriu."
           : "Registrado. Envie pela janela do WhatsApp que abriu.",
       );
       setAberto(false);
@@ -137,21 +147,29 @@ export function Acoes({ linha, modelos }: { linha: LinhaDoControle; modelos: Mod
     }
   }
 
+  // Mensagem de boleto com PDF anexado ao mês: o Outlook abre e o PDF baixa junto.
+  const comPdf = passo.tipo === "mensagem" && passo.modelo === "boleto" && Boolean(linha.boletoArquivoId);
+
   function peloWhatsapp() {
     const destino = linkWhatsapp(linha.gestorCelular, texto);
     if (!destino) {
       aviso.mostrar("Este cliente não tem celular cadastrado.");
       return;
     }
-
-    // A janela nasce do CLIQUE, e não depois do `await`: aberta depois da ida
-    // à rede, o bloqueador de pop-up a barra. E sem `noopener`, porque com ele
-    // `window.open` devolve null por especificação e o código abriria uma
-    // segunda janela; o opener é zerado logo em seguida, que protege igual.
-    const janela = window.open(destino, "_blank");
-    if (janela) janela.opener = null;
-
+    abrirNoWhatsapp(destino);
     void registrar("whatsapp");
+  }
+
+  function peloOutlook() {
+    const assunto = modeloSalvo ? montarMensagem(modeloSalvo.assunto, contexto()) : cliente;
+    const destino = linkEmail(linha.gestorEmail, assunto, texto);
+    if (!destino) {
+      aviso.mostrar("Este cliente não tem e-mail cadastrado.");
+      return;
+    }
+    abrirNoOutlook(destino);
+    if (comPdf && linha.boletoArquivoId) baixarArquivo(linha.boletoArquivoId);
+    void registrar("email");
   }
 
   return (
@@ -189,8 +207,8 @@ export function Acoes({ linha, modelos }: { linha: LinhaDoControle; modelos: Mod
               </Botao>
             ) : null}
             {canais.email ? (
-              <Botao onClick={() => void registrar("email")} disabled={ocupado || !texto.trim()}>
-                {ocupado ? "Enviando…" : "Enviar e-mail"}
+              <Botao onClick={peloOutlook} disabled={ocupado || !texto.trim()}>
+                {comPdf ? "Abrir no Outlook e baixar o PDF" : "Abrir no Outlook"}
               </Botao>
             ) : null}
           </>
@@ -240,6 +258,13 @@ export function Acoes({ linha, modelos }: { linha: LinhaDoControle; modelos: Mod
                 </div>
               ) : null}
             </dl>
+
+            {canais.email ? (
+              <p className="rounded-[8px] bg-surface-2 px-3 py-2.5 text-[12.5px] leading-relaxed text-texto">
+                O Outlook deste computador abre com destinatário, assunto e texto prontos. Revise e clique em
+                Enviar.{comPdf ? " O PDF do boleto baixa junto: arraste o arquivo para o e-mail." : ""}
+              </p>
+            ) : null}
 
             {canais.whatsapp ? (
               <p className="rounded-[8px] bg-surface-2 px-3 py-2.5 text-[12.5px] leading-relaxed text-texto">

@@ -1,9 +1,7 @@
 import "server-only";
 
 import { lerControle, listarModelos } from "./consulta";
-import { registrarMensagem } from "./servico";
-import { anexoDeEmail } from "../arquivos/servico";
-import { enviarEmail } from "../email/enviar";
+import { prepararMensagem } from "./servico";
 import { canaisPossiveis, montarEmailDaMensagem } from "../dominio/mensagem";
 import { nomeCurto } from "../dominio/cliente";
 import { urlBase } from "../ambiente";
@@ -27,9 +25,9 @@ import type { ModeloDeMensagem } from "../dominio/controle";
  */
 
 export type ResultadoDoEnvio = {
-  /** O e-mail saiu de verdade. */
+  /** Um e-mail ficou pronto na fila, para a analista abrir no Outlook. */
   email: boolean;
-  /** Um WhatsApp ficou pendente, para a analista abrir. */
+  /** Um WhatsApp ficou pronto na fila, para a analista abrir. */
   whatsapp: boolean;
   /** Em português, o que contar à analista. `null` quando tudo saiu. */
   aviso: string | null;
@@ -38,7 +36,6 @@ export type ResultadoDoEnvio = {
 export async function enviarMensagemDoPasso(
   controleId: string,
   modelo: ModeloDeMensagem,
-  autor: string,
 ): Promise<ResultadoDoEnvio> {
   const nada: ResultadoDoEnvio = { email: false, whatsapp: false, aviso: null };
 
@@ -65,7 +62,7 @@ export async function enviarMensagemDoPasso(
     const token =
       modelo === "informar" || modelo === "correcao" ? await lerTokenDoMes(controleId) : null;
 
-    const email = montarEmailDaMensagem(salvo, {
+    const conteudo = montarEmailDaMensagem(salvo, {
       cliente,
       gestor: linha.gestorNome,
       competencia: linha.competencia,
@@ -81,55 +78,23 @@ export async function enviarMensagemDoPasso(
       analista: linha.analista,
     });
 
-    let enviouEmail = false;
-    let avisoEmail: string | null = null;
-
+    // Nada sai daqui (decisão de 07/10): a mensagem fica PRONTA na fila
+    // "Mensagens para enviar", e a analista abre no Outlook ou no WhatsApp.
+    let email = false;
+    let whatsapp = false;
     if (canais.email && linha.gestorEmail) {
-      const anexo =
-        modelo === "boleto" && linha.boletoArquivoId ? await anexoDeEmail(linha.boletoArquivoId) : null;
-
-      const envio = await enviarEmail({
-        para: [linha.gestorEmail],
-        assunto: email.assunto,
-        texto: email.texto,
-        html: email.html,
-        ...(anexo ? { anexos: [anexo] } : {}),
-      });
-
-      enviouEmail = envio.ok;
-      await registrarMensagem(
-        controleId,
-        modelo,
-        "email",
-        linha.gestorEmail,
-        email.texto,
-        autor,
-        envio.ok ? null : envio.codigo,
-      );
-
-      if (!envio.ok) {
-        avisoEmail =
-          envio.codigo === "sem_provedor"
-            ? "O boleto foi salvo, mas o e-mail ainda não está configurado — avise o cliente por fora."
-            : "O boleto foi salvo, mas o e-mail não saiu. Reenvie pelo botão da linha.";
-      }
+      email = (await prepararMensagem(controleId, modelo, "email", linha.gestorEmail, conteudo.assunto, conteudo.texto)).ok;
     }
-
-    // O WhatsApp não sai daqui: ele é um link que a analista abre com um
-    // clique, e prometer entrega que ninguém verifica é pior que não prometer.
-    let pendente = false;
     if (canais.whatsapp && linha.gestorCelular) {
-      await registrarMensagem(controleId, modelo, "whatsapp", linha.gestorCelular, email.texto, null);
-      pendente = true;
+      whatsapp = (await prepararMensagem(controleId, modelo, "whatsapp", linha.gestorCelular, null, conteudo.texto)).ok;
     }
 
     const aviso =
-      avisoEmail ??
-      (pendente && !canais.email
-        ? "Boleto salvo. O cliente recebe por WhatsApp — abra pelo botão da linha."
-        : null);
+      email || whatsapp
+        ? "Boleto anexado. Avise o cliente em Alertas › Mensagens para enviar, ou pelo botão Enviar mensagem da linha."
+        : "Boleto anexado, mas não consegui preparar a mensagem. Avise pelo botão Enviar mensagem da linha.";
 
-    return { email: enviouEmail, whatsapp: pendente, aviso };
+    return { email, whatsapp, aviso };
   } catch {
     return { ...nada, aviso: "O boleto foi salvo, mas não consegui avisar o cliente. Reenvie pelo botão da linha." };
   }

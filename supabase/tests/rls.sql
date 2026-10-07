@@ -323,6 +323,12 @@ select pg_temp.exigir_recusa(
   'perfil de leitura gastou com IA'
 );
 
+-- A fila de mensagens: quem so le nao marca nada como enviado.
+with alterado as (
+  update messages set status = 'sent', subject = 'teste' where control_id = 'c0000000-0000-0000-0000-00000000000a' returning 1
+)
+select pg_temp.exigir((select count(*) from alterado) = 0, 'perfil de leitura marcou mensagem como enviada');
+
 -- Gerar link e ESCRITA: o token e a credencial de quem vai informar as vidas da
 -- empresa, e quem so le nao distribui credencial.
 with alterado as (

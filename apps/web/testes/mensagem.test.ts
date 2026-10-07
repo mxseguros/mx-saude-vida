@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   canaisPossiveis,
+  linkEmail,
   linkWhatsapp,
+  LIMITE_DO_MAILTO,
   montarMensagem,
   variaveisDaMensagem,
   variaveisComUmaChaveSo,
@@ -155,5 +157,25 @@ describe("canais", () => {
       email: true,
     });
     expect(canaisPossiveis("whatsapp", { celular: "", email: null })).toEqual({ whatsapp: false, email: false });
+  });
+});
+
+describe("e-mail pelo Outlook (mailto)", () => {
+  it("leva destinatário, assunto e texto, com quebra de linha CRLF", () => {
+    const link = linkEmail("gestor@exemplo.test", "Boleto de setembro", "Olá!\nSegue o boleto.");
+    expect(link).toBe("mailto:gestor%40exemplo.test?subject=Boleto%20de%20setembro&body=Ol%C3%A1!%0D%0ASegue%20o%20boleto.");
+  });
+
+  it("sem e-mail válido, não há link", () => {
+    expect(linkEmail("", "a", "b")).toBeNull();
+    expect(linkEmail("sem-arroba", "a", "b")).toBeNull();
+    expect(linkEmail(null, "a", "b")).toBeNull();
+  });
+
+  // Acima de ~2.000 caracteres o Windows corta o link e o Outlook abre vazio.
+  it("texto longo é cortado com reticências para caber", () => {
+    const link = linkEmail("gestor@exemplo.test", "Assunto", "ção ".repeat(800))!;
+    expect(link.length).toBeLessThanOrEqual(LIMITE_DO_MAILTO);
+    expect(decodeURIComponent(link)).toMatch(/…$/);
   });
 });

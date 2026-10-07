@@ -11,6 +11,7 @@ Leia este arquivo primeiro ao retomar. Os planos longos ficam para consulta pont
 - Cliente › Apólice: upload do PDF, agente preenche (✦), analista salva. Registro da IA (`ai_runs`, teto, cache) corrigido em 06/10.
 - Alertas (`/alertas`) e sino no menu com atrasados + hoje; somem quando a ação é registrada. Sem filtro por analista e sem aviso diário (decisão de 06/10).
 - Ficha do cliente em abas (`?aba=`): Cadastro e apólice · Funcionários (base de vidas, demitir/readmitir, importar, capital pela apólice) · Movimentações · Boletos.
+- E-mail pelo Outlook de quem envia (`mailto:`), como o WhatsApp. A rotina das 7h e o boleto anexado deixam as mensagens em Alertas › Mensagens para enviar; nada sai sem a analista clicar. O PDF do boleto baixa junto para arrastar no e-mail.
 - 5ª data "Confirmar emissão" (opcional por cliente): atividade no Controle, Alertas e agenda, botão Confirmar.
 - 429 testes, 90 provas Playwright, RLS e CI verdes.
 
@@ -32,7 +33,6 @@ Leia este arquivo primeiro ao retomar. Os planos longos ficam para consulta pont
 
 ## Pendências do Gabriel
 
-- Provedor de e-mail (Graph ou Resend): sem ele nenhuma mensagem sai sozinha.
 - Clientes sem celular nem e-mail do gestor.
 
 ## Como rodar

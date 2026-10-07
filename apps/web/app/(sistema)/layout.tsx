@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Moldura } from "@/app/_admin/moldura";
 import { lerAlertas } from "@/lib/alertas/consulta";
 import { contarUrgentes } from "@/lib/dominio/alerta";
+import { contarPendentes } from "@/lib/mensagens/pendentes";
 import { situacaoDoAcesso } from "@/lib/supabase/servidor";
 
 /**
@@ -49,8 +50,10 @@ export default async function LayoutDoSistema({
   }
 
   // O sino conta em toda página. Falhou, o menu segue sem número — nunca a tela.
-  const alertas = await lerAlertas();
-  const sino = alertas.erro ? undefined : contarUrgentes(alertas.dados);
+  // As mensagens para enviar entram no número do sino: é trabalho do dia.
+  const [alertas, pendentes] = await Promise.all([lerAlertas(), contarPendentes()]);
+  const urgentes = alertas.erro ? undefined : contarUrgentes(alertas.dados);
+  const sino = urgentes ? { ...urgentes, urgentes: urgentes.urgentes + (pendentes ?? 0) } : undefined;
 
   return (
     <Moldura perfil={acesso.perfil} alertas={sino}>

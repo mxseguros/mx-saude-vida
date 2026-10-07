@@ -14,7 +14,6 @@ import {
 import { competenciaDeHoje } from "../dominio/hoje";
 import { canaisPossiveis, montarEmailDaMensagem, ROTULO_MODELO } from "../dominio/mensagem";
 import { nomeCurto } from "../dominio/cliente";
-import { enviarEmail } from "../email/enviar";
 import { registrarLog } from "../log";
 import { garantirLinkDeColeta } from "./coleta";
 import { abrirCompetencia } from "./servico";
@@ -38,8 +37,8 @@ type Cliente = ReturnType<typeof clienteAdministrador>;
 export type ResumoDoDia = {
   abertos: number;
   avancados: number;
-  emailsEnviados: number;
-  emailsFalhos: number;
+  /** E-mails prontos na fila, para a analista abrir no Outlook. */
+  emailsPendentes: number;
   whatsappsPendentes: number;
   semContato: number;
   /** Linhas de movimentacao apagadas por retencao: nome e CPF de quem entrou e saiu. */
@@ -87,8 +86,7 @@ export async function rodarODia(hoje: string, supabase: Cliente): Promise<Resumo
   const resumo: ResumoDoDia = {
     abertos: 0,
     avancados: 0,
-    emailsEnviados: 0,
-    emailsFalhos: 0,
+    emailsPendentes: 0,
     whatsappsPendentes: 0,
     semContato: 0,
     movimentacaoRemovida: 0,
@@ -307,18 +305,11 @@ async function enviarDoDia(
   // O WhatsApp leva o mesmo texto, sem o embrulho de HTML.
   const texto = email.texto;
 
+  // O e-mail também fica PENDENTE (decisão de 07/10): a analista abre no
+  // Outlook dela pela fila "Mensagens para enviar". Nada sai sem alguém clicar.
   if (canais.email && linha.manager_email) {
-    const envio = await enviarEmail({
-      para: [linha.manager_email],
-      assunto: email.assunto,
-      texto,
-      html: email.html,
-    });
-
-    if (envio.ok) resumo.emailsEnviados += 1;
-    else resumo.emailsFalhos += 1;
-
-    await gravar(supabase, linha.id, modelo, "email", linha.manager_email, texto, envio.ok ? null : envio.codigo);
+    await gravar(supabase, linha.id, modelo, "email", linha.manager_email, texto, null, "pending", email.assunto);
+    resumo.emailsPendentes += 1;
   }
 
   if (canais.whatsapp && linha.manager_phone) {
@@ -343,6 +334,7 @@ async function gravar(
   corpo: string,
   falhou: string | null,
   estado: "sent" | "pending" = "sent",
+  assunto: string | null = null,
 ): Promise<void> {
   const status = falhou ? "failed" : estado;
 
@@ -353,6 +345,7 @@ async function gravar(
       kind: deModelo(modelo),
       channel: canal,
       to_address: destino,
+      subject: assunto,
       body: corpo,
       status,
       sent_by: null,

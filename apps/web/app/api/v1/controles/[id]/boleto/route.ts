@@ -143,7 +143,7 @@ export async function POST(request: Request, contexto: { params: Promise<{ id: s
   // Nunca derruba a resposta: anexar deu certo, e perder isso porque o
   // provedor de e-mail está fora seria trocar trabalho feito por nada. O aviso
   // volta no corpo e a tela mostra.
-  const envio = await enviarMensagemDoPasso(id, "boleto", sessao.perfil.id);
+  const envio = await enviarMensagemDoPasso(id, "boleto");
 
   return Response.json({ data: { ...resultado.dados, envio } }, { status: 201 });
 }

@@ -1,23 +1,17 @@
 import { erroJson, exigirEscrita, lerCorpo } from "@/lib/api";
 import { lerControle, listarModelos } from "@/lib/controles/consulta";
 import { registrarMensagem } from "@/lib/controles/servico";
-import { mensagemDoPasso } from "@/lib/dominio/controle";
-import { canaisPossiveis, montarMensagem } from "@/lib/dominio/mensagem";
-import { enviarEmail } from "@/lib/email/enviar";
-import { anexoDeEmail } from "@/lib/arquivos/servico";
-import { ROTULO_MODELO } from "@/lib/dominio/mensagem";
-import { montarNotificacao } from "@/lib/dominio/email";
 import { nomeCurto } from "@/lib/dominio/cliente";
+import { mensagemDoPasso } from "@/lib/dominio/controle";
+import { canaisPossiveis, montarMensagem, ROTULO_MODELO } from "@/lib/dominio/mensagem";
 
 /**
- * POST /api/v1/controles/[id]/mensagem  { canal, texto }
+ * POST /api/v1/controles/[id]/mensagem — REGISTRA a mensagem que a analista
+ * acabou de abrir no WhatsApp (`wa.me`) ou no Outlook (`mailto:`).
  *
- * O MODELO não vem do cliente: ele é derivado do passo atual, aqui no
- * servidor. Aceitar o modelo do corpo deixaria a tela mandar aviso de
- * vencimento a quem ainda não tem boleto.
- *
- * No WhatsApp a rota só REGISTRA: quem abre a conversa é o navegador da
- * analista. No e-mail a rota envia de verdade.
+ * Nada sai daqui: quem envia é a analista, no programa dela (decisão de
+ * 07/10). O registro é o que alimenta "Última mensagem" e a linha do tempo, e
+ * conclui a pendente do mesmo tipo que a rotina tinha deixado na fila.
  */
 export async function POST(request: Request, contexto: { params: Promise<{ id: string }> }) {
   const sessao = await exigirEscrita();
@@ -46,8 +40,7 @@ export async function POST(request: Request, contexto: { params: Promise<{ id: s
     );
   }
 
-  // O canal precisa estar habilitado NO CADASTRO e ter destino. Sem isto, um
-  // POST direto mandaria e-mail a quem pediu só WhatsApp.
+  // O canal precisa estar habilitado NO CADASTRO e ter destino.
   const possiveis = canaisPossiveis(linha.canal, { celular: linha.gestorCelular, email: linha.gestorEmail });
   if (!possiveis[canal]) {
     return erroJson(
@@ -59,18 +52,13 @@ export async function POST(request: Request, contexto: { params: Promise<{ id: s
   }
 
   const destino = (canal === "email" ? linha.gestorEmail : linha.gestorCelular) as string;
-  let falhou: string | null = null;
 
+  // O assunto registrado vem do modelo salvo, igual ao que a janela montou.
+  let assunto: string | null = null;
   if (canal === "email") {
     const cliente = nomeCurto({ razaoSocial: linha.razaoSocial, nomeFantasia: linha.nomeFantasia });
-
-    // O ASSUNTO vem do modelo salvo, e não do corpo da requisição: a analista
-    // edita o texto na janela, não o assunto, e deixar o cliente escolhê-lo
-    // seria uma porta para mandar qualquer coisa em nome da MX.
-    const modelos = await listarModelos();
-    const salvo = modelos.dados.find((m) => m.modelo === modelo);
-
-    const assunto = salvo
+    const salvo = (await listarModelos()).dados.find((m) => m.modelo === modelo);
+    assunto = salvo
       ? montarMensagem(salvo.assunto, {
           cliente,
           gestor: linha.gestorNome,
@@ -85,42 +73,9 @@ export async function POST(request: Request, contexto: { params: Promise<{ id: s
           analista: linha.analista,
         })
       : `${ROTULO_MODELO[modelo]} · ${cliente}`;
-
-    // O corpo já vem renderizado da janela da analista: `montarNotificacao`
-    // aqui só embrulha no HTML com o cabeçalho da corretora — o mesmo que o
-    // cron manda, para o cliente não receber dois formatos.
-    const email = montarNotificacao({ assunto, corpo: texto }, {});
-
-    // A mensagem de BOLETO leva o PDF junto: o cliente recebe o documento no
-    // e-mail em vez de ter que entrar no portal para baixar 20 KB. Anexo que
-    // nao da para montar nao impede o envio — avisar sem o PDF e util.
-    const anexo =
-      modelo === "boleto" && linha.boletoArquivoId ? await anexoDeEmail(linha.boletoArquivoId) : null;
-
-    const envio = await enviarEmail({
-      para: [destino],
-      assunto: email.assunto,
-      texto: email.texto,
-      html: email.html,
-      ...(anexo ? { anexos: [anexo] } : {}),
-    });
-
-    // `sem_provedor` não é erro de quem clicou: é configuração que falta, e a
-    // mensagem precisa dizer isso em vez de "tente de novo".
-    if (!envio.ok) {
-      falhou = envio.codigo;
-      await registrarMensagem(id, modelo, canal, destino, texto, sessao.perfil.id, falhou);
-      return erroJson(
-        503,
-        "email_nao_enviado",
-        envio.codigo === "sem_provedor"
-          ? "O envio de e-mail ainda não está configurado. Use o WhatsApp ou avise o administrador."
-          : envio.mensagem,
-      );
-    }
   }
 
-  const resultado = await registrarMensagem(id, modelo, canal, destino, texto, sessao.perfil.id);
+  const resultado = await registrarMensagem(id, modelo, canal, destino, texto, sessao.perfil.id, null, undefined, assunto);
   if (!resultado.ok) {
     const { status, codigo, mensagem } = resultado.falha;
     return erroJson(status, codigo, mensagem);

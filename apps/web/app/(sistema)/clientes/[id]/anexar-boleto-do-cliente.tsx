@@ -55,7 +55,7 @@ export function AnexarBoletoDoCliente({
       </div>
       <p className="m-0 text-[12.5px] text-muted">
         {aptos.length
-          ? "O boleto entra no mês escolhido, a movimentação avança e a mensagem de boleto sai pelo canal do cliente."
+          ? "O boleto entra no mês escolhido e a movimentação avança. A mensagem de boleto fica pronta em Alertas › Mensagens para enviar."
           : "O boleto entra depois que a movimentação do mês é conferida. Confira o mês na aba Movimentações."}
         {escolhido && !aptos.some((m) => m.controleId === escolhido) && aptos.length
           ? " Este mês ainda não está na etapa de boleto."
