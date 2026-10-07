@@ -191,7 +191,7 @@ export function FormularioCliente({
       <section className="flex flex-col gap-4 rounded-[10px] border border-line bg-surface p-4 sm:p-5">
         <div>
           <h2 className="font-(family-name:--font-display) text-[15px] font-[700] text-heading">Regras do mês</h2>
-          <p className="mt-1 max-w-[62ch] text-[13px] leading-relaxed text-muted">
+          <p className="mt-1 text-[13px] leading-relaxed text-muted">
             O dia do mês de cada etapa. Eles se repetem todo mês, e é deles que nascem a linha do Controle e as
             quatro mensagens ao cliente. Dia que não existe no mês vira o último; data menor que a anterior cai no
             mês seguinte.
@@ -294,7 +294,7 @@ export function FormularioCliente({
       <section className="flex flex-col gap-4 rounded-[10px] border border-line bg-surface p-4 sm:p-5">
         <div>
           <h2 className="font-(family-name:--font-display) text-[15px] font-[700] text-heading">Canal de aviso</h2>
-          <p className="mt-1 max-w-[62ch] text-[13px] leading-relaxed text-muted">
+          <p className="mt-1 text-[13px] leading-relaxed text-muted">
             Por onde o gestor do cliente recebe as mensagens das quatro datas. O e-mail sai sozinho; o WhatsApp
             abre com o texto pronto para a analista enviar.
           </p>
