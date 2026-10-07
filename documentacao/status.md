@@ -13,6 +13,7 @@ Leia este arquivo primeiro ao retomar. Os planos longos ficam para consulta pont
 - Ficha do cliente em abas (`?aba=`): Cadastro e apólice · Funcionários (base de vidas, demitir/readmitir, importar, capital pela apólice) · Movimentações · Boletos.
 - E-mail pelo Outlook de quem envia (`mailto:`), como o WhatsApp. A rotina das 7h e o boleto anexado deixam as mensagens em Alertas › Mensagens para enviar; nada sai sem a analista clicar. O PDF do boleto baixa junto para arrastar no e-mail.
 - Cliente que faz a própria movimentação (opção em Regras do mês, ou em lote na lista de Clientes): sem planilha, link nem corte; o mês começa esperando o boleto e ficam só boleto e confirmação de pagamento.
+- A MX acompanha o pagamento de todo cliente: a opção "A MX acompanha o pagamento" saiu (07/10).
 - 5ª data "Confirmar emissão" (opcional por cliente): atividade no Controle, Alertas e agenda, botão Confirmar.
 - 429 testes, 90 provas Playwright, RLS e CI verdes.
 
