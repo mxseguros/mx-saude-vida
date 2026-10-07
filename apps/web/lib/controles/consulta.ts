@@ -45,8 +45,6 @@ export type LinhaDoControle = {
   parcelaDoBoleto: string | null;
   boletoArquivoId: string | null;
   pagaEm: string | null;
-  /** `false` = a seguradora cobra direto; o mes fecha no boleto. */
-  acompanhaPagamento: boolean;
 
   ultimaMensagem: { modelo: ModeloDeMensagem; canal: "email" | "whatsapp"; em: string } | null;
 
@@ -117,7 +115,6 @@ type LinhaDaView = {
   invoice_installment: string | null;
   invoice_file_id: string | null;
   paid_at: string | null;
-  mx_tracks_payment: boolean;
   legal_name: string;
   trade_name: string | null;
   document: string;
@@ -182,7 +179,6 @@ function paraLinha(v: LinhaDaView): LinhaDoControle {
     parcelaDoBoleto: v.invoice_installment,
     boletoArquivoId: v.invoice_file_id,
     pagaEm: v.paid_at,
-    acompanhaPagamento: v.mx_tracks_payment,
     ultimaMensagem:
       v.last_message_kind && v.last_message_at
         ? {

@@ -114,8 +114,6 @@ export type MesParaAgenda = {
   analista: string | null;
   passo: Passo;
   datas: DatasDoMes;
-  /** `false` = a seguradora cobra direto: não há vencimento a controlar. */
-  acompanhaPagamento: boolean;
   /** A analista já clicou em Confirmar emissão neste mês. */
   emissaoConfirmada?: boolean;
 };
@@ -132,8 +130,6 @@ export function atividadesDoMes(mes: MesParaAgenda, hoje: string): Atividade[] {
   const saida: Atividade[] = [];
 
   for (const tipo of TIPOS_DE_ATIVIDADE) {
-    // Cliente que paga direto na seguradora não tem vencimento a acompanhar.
-    if (tipo === "vencimento" && !mes.acompanhaPagamento) continue;
 
     const dia = mes.datas[DATA_DA_ATIVIDADE[tipo]];
     if (dia === null || dia === undefined) continue;

@@ -110,14 +110,6 @@ export const esquemaCliente = z.preprocess(semColetaSeMovimentacaoPropria, z
     confirmarDia: diaDoMes("Confirmar emissão"),
     boletoDia: diaObrigatorio("Emissão do boleto"),
     vencimentoDia: diaObrigatorio("Vencimento"),
-    /**
-     * `false` = a seguradora cobra direto.
-     *
-     * O mes desse cliente FECHA ao anexar o boleto, e a mensagem de vencimento
-     * nao sai. `vencimentoDia` continua obrigatorio porque a coluna e, mas
-     * deixa de significar algo — e a tela diz isso.
-     */
-    acompanhaPagamento: booleanoDeFormulario,
     /** Ele informa direto na seguradora: sem planilha, sem link, sem corte. */
     movimentacaoPropria: booleanoDeFormulario,
 

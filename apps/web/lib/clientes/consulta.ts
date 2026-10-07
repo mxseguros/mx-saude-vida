@@ -29,7 +29,6 @@ export type ClienteDaLista = {
   canal: Canal;
   corteDia: number | null;
   vencimentoDia: number;
-  acompanhaPagamento: boolean;
   /** Faz a própria movimentação: sem planilha, sem link, sem corte. */
   movimentacaoPropria: boolean;
   ativo: boolean;
@@ -47,7 +46,7 @@ export type ClienteCompleto = ClienteDaLista & {
 };
 
 const CAMPOS_DA_LISTA =
-  "id, legal_name, trade_name, document, product, channel, cutoff_day, due_day, mx_tracks_payment, self_managed, active, insurers(name)";
+  "id, legal_name, trade_name, document, product, channel, cutoff_day, due_day, self_managed, active, insurers(name)";
 
 const CAMPOS_COMPLETOS = `${CAMPOS_DA_LISTA}, insurer_id, notes, inform_day, confirm_day, invoice_day, manager_name, manager_phone, manager_email`;
 
@@ -60,7 +59,6 @@ type LinhaDaLista = {
   channel: string;
   cutoff_day: number | null;
   due_day: number;
-  mx_tracks_payment: boolean;
   self_managed: boolean | null;
   active: boolean;
   // O PostgREST devolve a relação como objeto ou lista, conforme a cardinalidade.
@@ -95,7 +93,6 @@ function paraLista(linha: LinhaDaLista): ClienteDaLista {
     canal: paraCanal(linha.channel),
     corteDia: linha.cutoff_day,
     vencimentoDia: linha.due_day,
-    acompanhaPagamento: linha.mx_tracks_payment,
     movimentacaoPropria: linha.self_managed === true,
     ativo: linha.active,
   };

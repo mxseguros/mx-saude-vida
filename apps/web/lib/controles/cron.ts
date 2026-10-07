@@ -64,7 +64,6 @@ type LinhaDoDia = {
   insurer_name: string | null;
   analyst_name: string | null;
   invoice_amount: string | number | null;
-  mx_tracks_payment: boolean;
 };
 
 /**
@@ -104,7 +103,7 @@ export async function rodarODia(hoje: string, supabase: Cliente): Promise<Resumo
   const { data, error } = await supabase
     .from("v_control_board")
     .select(
-      "id, step, inform_date, cutoff_date, invoice_date, due_date, competence, legal_name, trade_name, channel, manager_name, manager_phone, manager_email, insurer_name, analyst_name, invoice_amount, mx_tracks_payment",
+      "id, step, inform_date, cutoff_date, invoice_date, due_date, competence, legal_name, trade_name, channel, manager_name, manager_phone, manager_email, insurer_name, analyst_name, invoice_amount",
     )
     .in(
       "competence",
@@ -160,7 +159,7 @@ export async function rodarODia(hoje: string, supabase: Cliente): Promise<Resumo
 
     // 2. O avanço que o calendário faz sozinho.
     const passoAtual = paraPasso(linha.step);
-    const passo = avancoAutomatico(passoAtual, datas, hoje, linha.mx_tracks_payment);
+    const passo = avancoAutomatico(passoAtual, datas, hoje);
 
     if (passo !== passoAtual) {
       const mudou = await avancarPasso(supabase, linha.id, passoAtual, passo);
@@ -172,7 +171,7 @@ export async function rodarODia(hoje: string, supabase: Cliente): Promise<Resumo
     }
 
     // 3. A mensagem cujo dia chegou.
-    const modelo = mensagemDevida(passo, datas, hoje, linha.mx_tracks_payment);
+    const modelo = mensagemDevida(passo, datas, hoje);
     if (!modelo) continue;
     if (jaSaiu.has(`${linha.id}:${deModelo(modelo)}`)) continue;
 
@@ -209,13 +208,7 @@ async function avancarPasso(
     origin: "system",
     from_step: dePasso(de),
     to_step: dePasso(para),
-    // O motivo importa na linha do tempo: "fechou porque a seguradora cobra
-    // direto" e "avançou porque a data chegou" são coisas diferentes, e quem
-    // for conferir o mês meses depois não tem como adivinhar qual foi.
-    note:
-      para === "concluida"
-        ? "Mês fechado: a seguradora cobra direto."
-        : "Avanço automático pela data.",
+    note: "Avanço automático pela data.",
   });
 
   if (erroEvento) {

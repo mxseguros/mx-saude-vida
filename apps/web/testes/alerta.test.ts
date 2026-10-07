@@ -12,7 +12,6 @@ const mes = (troca: Partial<MesParaAlerta> = {}): MesParaAlerta => ({
   analista: null,
   passo: "informar",
   datas: { informar: "2026-09-08", corte: "2026-09-24", boleto: "2026-09-26", vencimento: "2026-10-10" },
-  acompanhaPagamento: true,
   reenviou: false,
   ...troca,
 });
@@ -50,10 +49,6 @@ describe("alertas de prazo", () => {
     expect(montarAlertas([mes({ passo: "concluida" })], HOJE)).toEqual([]);
   });
 
-  it("vencimento hoje sem acompanhar pagamento não alerta", () => {
-    const m = mes({ passo: "boleto", acompanhaPagamento: false, datas: { ...mes().datas, vencimento: HOJE } });
-    expect(montarAlertas([m], HOJE)).toEqual([]);
-  });
 
   it("ordena atrasado, hoje, próximos, validar; o sino conta atrasados e hoje", () => {
     const lista = montarAlertas(

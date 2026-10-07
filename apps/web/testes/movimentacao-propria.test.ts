@@ -28,7 +28,6 @@ describe("cadastro com movimentação própria", () => {
     confirmarDia: "",
     boletoDia: "16",
     vencimentoDia: "30",
-    acompanhaPagamento: "1",
     canal: "email",
     gestorNome: "",
     gestorCelular: "",

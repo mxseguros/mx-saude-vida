@@ -184,18 +184,11 @@ export type SituacaoDoPrazo = "vencido" | "hoje" | "perto" | "no_prazo";
 
 /**
  * O mês está ATRASADO: a data da etapa em que ele está já passou e a etapa não
- * foi cumprida. Concluído nunca está atrasado. Sem acompanhar o pagamento, o
- * vencimento não conta.
+ * foi cumprida. Concluído nunca está atrasado.
  */
-export function atrasadoNoPasso(
-  passo: Passo,
-  datas: DatasDoMes,
-  hoje: string,
-  acompanhaPagamento = true,
-): boolean {
+export function atrasadoNoPasso(passo: Passo, datas: DatasDoMes, hoje: string): boolean {
   const chave = dataEmFoco(passo);
   if (!chave) return false;
-  if (chave === "vencimento" && !acompanhaPagamento) return false;
   const data = datas[chave];
   return Boolean(data) && situacaoDoPrazo(data as string, hoje) === "vencido";
 }
@@ -298,14 +291,8 @@ export function avancoAutomatico(
   passo: Passo,
   datas: DatasDoMes,
   hoje: string,
-  acompanhaPagamento = true,
 ): Passo {
   if (passo === "conferida" && datas.corte !== null && hoje >= datas.corte) return "corte";
-
-  // Seguradora que cobra direto: o mes FECHA no boleto. Esperar um vencimento
-  // que ninguem vai conferir deixaria 39 clientes parados em "boleto" para
-  // sempre, enchendo a fila da analista de linha que nao pede nada.
-  if (passo === "boleto" && !acompanhaPagamento) return "concluida";
 
   if (passo === "boleto" && diasEntre(hoje, datas.vencimento) <= DIAS_DE_AVISO) return "vencimento";
   return passo;
@@ -347,19 +334,12 @@ export function mensagemDoPasso(passo: Passo): ModeloDeMensagem | null {
  * 3. **Não confere se já mandou.** Isso é do banco, por `(control_id, kind)`:
  *    a decisão "o que cabe hoje" é de calendário e fica aqui, pura; a decisão
  *    "isso já saiu" depende do que aconteceu e fica lá.
- * 4. **Cliente que paga direto na seguradora não recebe aviso de vencimento.**
- *    A MX não controla aquela data, e avisar sobre ela faz o cliente ligar para
- *    perguntar de onde veio o número.
  */
 export function mensagemDevida(
   passo: Passo,
   datas: DatasDoMes,
   hoje: string,
-  acompanhaPagamento = true,
 ): ModeloDeMensagem | null {
-  // Aviso de vencimento a quem paga direto na seguradora e mensagem sobre uma
-  // data que a MX nao controla — e o cliente liga para perguntar de onde veio.
-  if (!acompanhaPagamento && (passo === "vencimento" || passo === "boleto")) return null;
 
   if (passo === "informar") {
     return datas.informar !== null && hoje >= datas.informar ? "informar" : null;

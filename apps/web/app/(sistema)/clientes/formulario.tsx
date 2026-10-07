@@ -41,7 +41,6 @@ function valoresIniciais(cliente?: ClienteCompleto | null): Valores {
     vencimentoDia: cliente?.vencimentoDia ? String(cliente.vencimentoDia) : "",
     // `"1"` e nao `true`: o estado do formulario e um mapa de strings, e ele
     // sobe para a rota como esta. O esquema aceita as duas formas.
-    acompanhaPagamento: (cliente?.acompanhaPagamento ?? true) ? "1" : "",
     movimentacaoPropria: cliente?.movimentacaoPropria ? "1" : "",
     canal: cliente?.canal ?? "whatsapp",
     gestorNome: cliente?.gestorNome ?? "",
@@ -211,9 +210,9 @@ export function FormularioCliente({
               setValores((v) => ({
                 ...v,
                 movimentacaoPropria: ligado ? "1" : "",
-                // Ficam só o boleto e a confirmação do pagamento: o pagamento
-                // passa a ser acompanhado, e as datas de coleta saem.
-                ...(ligado ? { acompanhaPagamento: "1", informarDia: "", corteDia: "", confirmarDia: "" } : {}),
+                // Ficam só o boleto e a confirmação do pagamento: as datas de
+                // coleta saem.
+                ...(ligado ? { informarDia: "", corteDia: "", confirmarDia: "" } : {}),
               }));
             }}
           />
@@ -289,21 +288,6 @@ export function FormularioCliente({
           </p>
         ) : null}
 
-        <div className="border-t border-line pt-4">
-          <CaixaDeSelecao
-            rotulo="A MX acompanha o pagamento deste cliente"
-            motivo="Desmarque quando a seguradora cobra direto. O mês fecha ao anexar o boleto e o aviso de vencimento não sai."
-            checked={valores.acompanhaPagamento === "1"}
-            onChange={(e) => definir("acompanhaPagamento", e.target.checked ? "1" : "")}
-          />
-
-          {valores.acompanhaPagamento !== "1" ? (
-            <p role="status" className="mt-2 rounded-[8px] bg-surface-2 px-3 py-2.5 text-[13px] leading-relaxed text-texto">
-              A seguradora cobra direto. O dia de vencimento acima continua guardado, mas o sistema não controla
-              essa data nem avisa o cliente sobre ela.
-            </p>
-          ) : null}
-        </div>
       </section>
 
       {/* --------------------------- Canal de aviso --------------------------- */}

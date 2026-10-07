@@ -38,7 +38,6 @@ function mes(parcial: Partial<MesParaAgenda> = {}): MesParaAgenda {
     analista: "Ana",
     passo: "informar",
     datas: SETEMBRO,
-    acompanhaPagamento: true,
     ...parcial,
   };
 }
@@ -60,10 +59,6 @@ describe("as quatro atividades de um mês", () => {
     expect(lista.map((a) => a.tipo)).toEqual(["boleto", "vencimento"]);
   });
 
-  it("seguradora que cobra direto não tem vencimento a controlar", () => {
-    const lista = atividadesDoMes(mes({ acompanhaPagamento: false }), "2026-09-05");
-    expect(lista.map((a) => a.tipo)).toEqual(["informar", "corte", "boleto"]);
-  });
 });
 
 describe("o estado vem do PASSO, não de um palpite", () => {
@@ -275,7 +270,6 @@ describe("confirmar emissão (5ª data)", () => {
     analista: null,
     passo: "corte",
     datas,
-    acompanhaPagamento: true,
     ...troca,
   });
   const confirmar = (m: MesParaAgenda, hoje: string) => atividadesDoMes(m, hoje).find((a) => a.tipo === "confirmar");

@@ -24,7 +24,7 @@ export async function lerAlertas(hoje: string = hojeSaoPaulo()): Promise<{ dados
     const { data, error } = await supabase
       .from("v_control_board")
       .select(
-        "id, competence, step, inform_date, cutoff_date, invoice_date, due_date, legal_name, trade_name, insurer_name, analyst_name, mx_tracks_payment, resent_after_check, confirm_date, issue_confirmed_at",
+        "id, competence, step, inform_date, cutoff_date, invoice_date, due_date, legal_name, trade_name, insurer_name, analyst_name, resent_after_check, confirm_date, issue_confirmed_at",
       )
       .in("competence", [primeiroDia(anterior), primeiroDia(atual)]);
 
@@ -45,7 +45,6 @@ export async function lerAlertas(hoje: string = hojeSaoPaulo()): Promise<{ dados
           boleto: v.invoice_date as string,
           vencimento: v.due_date as string,
         },
-        acompanhaPagamento: v.mx_tracks_payment !== false,
         reenviou: v.resent_after_check === true,
         emissaoConfirmada: v.issue_confirmed_at !== null,
       }),

@@ -228,46 +228,7 @@ describe("mensagem e próximo passo", () => {
   });
 });
 
-/**
- * Seguradora que cobra direto: 39 clientes do CONTROLE FATURAS vinham com
- * vencimento `-`, `D/C` ou `BOLETO`. Não é dado faltando — é a MX não
- * acompanhando aquele pagamento.
- */
-describe("quando a MX não acompanha o pagamento", () => {
-  it("o mês FECHA no boleto, em vez de esperar vencimento", () => {
-    expect(avancoAutomatico("boleto", SETEMBRO, "2026-09-16", false)).toBe("concluida");
-  });
 
-  it("fecha mesmo longe do vencimento — a data não importa mais", () => {
-    expect(avancoAutomatico("boleto", SETEMBRO, "2026-09-01", false)).toBe("concluida");
-  });
-
-  it("acompanhando, o passo segue a regra da data", () => {
-    expect(avancoAutomatico("boleto", SETEMBRO, "2026-09-16", true)).toBe("boleto");
-    expect(avancoAutomatico("boleto", SETEMBRO, "2026-09-28", true)).toBe("vencimento");
-  });
-
-  it("o padrão é acompanhar: campo novo não muda quem já estava certo", () => {
-    expect(avancoAutomatico("boleto", SETEMBRO, "2026-09-28")).toBe("vencimento");
-  });
-
-  it("não mexe nos passos anteriores", () => {
-    expect(avancoAutomatico("informar", SETEMBRO, "2026-09-28", false)).toBe("informar");
-    expect(avancoAutomatico("conferida", SETEMBRO, "2026-09-11", false)).toBe("corte");
-  });
-
-  // Avisar sobre uma data que a MX não controla faz o cliente ligar para
-  // perguntar de onde veio o número.
-  it("nenhuma mensagem de boleto ou vencimento sai", () => {
-    expect(mensagemDevida("boleto", SETEMBRO, "2026-09-16", false)).toBeNull();
-    expect(mensagemDevida("vencimento", SETEMBRO, "2026-09-28", false)).toBeNull();
-  });
-
-  it("as mensagens do começo do mês continuam saindo", () => {
-    expect(mensagemDevida("informar", SETEMBRO, "2026-09-08", false)).toBe("informar");
-    expect(mensagemDevida("corte", SETEMBRO, "2026-09-10", false)).toBe("corte");
-  });
-});
 
 describe("a mensagem que o cron manda hoje", () => {
   it("no dia de informar, sai o aviso de informar", () => {
@@ -359,10 +320,6 @@ describe("atrasado na etapa", () => {
   });
   it("concluído nunca está atrasado", () => {
     expect(atrasadoNoPasso("concluida", datas, "2027-01-01")).toBe(false);
-  });
-  it("sem acompanhar pagamento, o vencimento não atrasa", () => {
-    expect(atrasadoNoPasso("vencimento", datas, "2026-10-05", false)).toBe(false);
-    expect(atrasadoNoPasso("vencimento", datas, "2026-10-05", true)).toBe(true);
   });
   // Cliente sem movimentação: o mês nasce esperando o boleto, não concluído.
   it("sem movimentação, o mês começa esperando o boleto", () => {

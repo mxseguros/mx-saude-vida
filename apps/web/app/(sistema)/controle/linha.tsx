@@ -74,7 +74,7 @@ const COR_DO_PASSO: Record<Passo, string> = {
  */
 export function Etiqueta({ linha, hoje }: { linha: LinhaDoControle; hoje: string }) {
   const { passo } = linha;
-  if (atrasadoNoPasso(passo, linha.datas, hoje, linha.acompanhaPagamento)) {
+  if (atrasadoNoPasso(passo, linha.datas, hoje)) {
     return (
       <span
         className="inline-flex items-center rounded-full border border-bad px-2 py-0.5 text-[11.5px] font-[600] text-bad"
