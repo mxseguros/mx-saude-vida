@@ -12,6 +12,7 @@ import {
   mensagemDoPasso,
   nomeDoMes,
   passoInicial,
+  atrasadoNoPasso,
   podeAgir,
   proximoPasso,
   rotuloDaCompetencia,
@@ -82,7 +83,7 @@ describe("datas da competência", () => {
       boleto: "2026-09-28",
       vencimento: "2026-10-03",
     });
-    expect(passoInicial(regras)).toBe("boleto");
+    expect(passoInicial(regras)).toBe("corte");
     expect(passoInicial(REGRAS)).toBe("informar");
   });
 
@@ -343,5 +344,28 @@ describe("competência", () => {
 
   it("tira a competência de um dia", () => {
     expect(competenciaDe("2026-09-22")).toBe("2026-09");
+  });
+});
+
+describe("atrasado na etapa", () => {
+  const datas = { informar: "2026-09-08", corte: "2026-09-10", boleto: "2026-09-16", vencimento: "2026-09-30" };
+  it("passou a data da etapa atual sem cumprir: atrasado", () => {
+    expect(atrasadoNoPasso("informar", datas, "2026-09-09")).toBe(true);
+    expect(atrasadoNoPasso("corte", datas, "2026-09-17")).toBe(true);
+  });
+  it("no dia ou antes, não", () => {
+    expect(atrasadoNoPasso("informar", datas, "2026-09-08")).toBe(false);
+    expect(atrasadoNoPasso("corte", datas, "2026-09-15")).toBe(false);
+  });
+  it("concluído nunca está atrasado", () => {
+    expect(atrasadoNoPasso("concluida", datas, "2027-01-01")).toBe(false);
+  });
+  it("sem acompanhar pagamento, o vencimento não atrasa", () => {
+    expect(atrasadoNoPasso("vencimento", datas, "2026-10-05", false)).toBe(false);
+    expect(atrasadoNoPasso("vencimento", datas, "2026-10-05", true)).toBe(true);
+  });
+  // Cliente sem movimentação: o mês nasce esperando o boleto, não concluído.
+  it("sem movimentação, o mês começa esperando o boleto", () => {
+    expect(passoInicial({ informarDia: null, corteDia: null, boletoDia: 16, vencimentoDia: 30 })).toBe("corte");
   });
 });

@@ -149,7 +149,10 @@ export function datasDaCompetencia(competencia: string, regras: RegrasDoMes): Da
 
 /** O passo em que o mês de um cliente nasce. */
 export function passoInicial(regras: RegrasDoMes): Passo {
-  return regras.informarDia === null && regras.corteDia === null ? "boleto" : "informar";
+  // Sem movimentação de vidas, o mês começa ESPERANDO o boleto ("corte"), e
+  // não em "boleto", que quer dizer boleto já anexado. Começar em "boleto"
+  // fazia a rotina fechar o mês como concluído sem boleto nenhum (07/10).
+  return regras.informarDia === null && regras.corteDia === null ? "corte" : "informar";
 }
 
 /* --------------------------------------------------------------------------
@@ -178,6 +181,24 @@ export function dataEmFoco(passo: Passo): ChaveDeData | null {
 }
 
 export type SituacaoDoPrazo = "vencido" | "hoje" | "perto" | "no_prazo";
+
+/**
+ * O mês está ATRASADO: a data da etapa em que ele está já passou e a etapa não
+ * foi cumprida. Concluído nunca está atrasado. Sem acompanhar o pagamento, o
+ * vencimento não conta.
+ */
+export function atrasadoNoPasso(
+  passo: Passo,
+  datas: DatasDoMes,
+  hoje: string,
+  acompanhaPagamento = true,
+): boolean {
+  const chave = dataEmFoco(passo);
+  if (!chave) return false;
+  if (chave === "vencimento" && !acompanhaPagamento) return false;
+  const data = datas[chave];
+  return Boolean(data) && situacaoDoPrazo(data as string, hoje) === "vencido";
+}
 
 /** Quantos dias antes o prazo começa a chamar atenção. */
 export const DIAS_DE_AVISO = 3;

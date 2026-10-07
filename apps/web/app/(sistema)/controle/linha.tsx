@@ -1,5 +1,6 @@
 import {
   aparenciaDaData,
+  atrasadoNoPasso,
   ROTULO_DATA,
   ROTULO_PASSO,
   type AparenciaDaData,
@@ -67,7 +68,22 @@ const COR_DO_PASSO: Record<Passo, string> = {
   concluida: "bg-ok-soft text-ok",
 };
 
-export function Etiqueta({ passo }: { passo: Passo }) {
+/**
+ * A etapa do mês. Passou a data da etapa atual sem cumprir, vira "Atrasado":
+ * fonte vermelha com contorno, nunca fundo vermelho (regra de Interface).
+ */
+export function Etiqueta({ linha, hoje }: { linha: LinhaDoControle; hoje: string }) {
+  const { passo } = linha;
+  if (atrasadoNoPasso(passo, linha.datas, hoje, linha.acompanhaPagamento)) {
+    return (
+      <span
+        className="inline-flex items-center rounded-full border border-bad px-2 py-0.5 text-[11.5px] font-[600] text-bad"
+        title={`Atrasado na etapa ${ROTULO_PASSO[passo].toLowerCase()}`}
+      >
+        Atrasado
+      </span>
+    );
+  }
   return (
     <span
       className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11.5px] font-[600] ${COR_DO_PASSO[passo]}`}

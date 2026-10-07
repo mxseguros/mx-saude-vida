@@ -233,7 +233,7 @@ export default async function PaginaControle({
                       </td>
                       <td className="px-2.5 py-2.5 text-muted">{linha.seguradora ?? "—"}</td>
                       <td className="px-2.5 py-2.5">
-                        <Etiqueta passo={linha.passo} />
+                        <Etiqueta linha={linha} hoje={hoje} />
                       </td>
                       {CHAVES_DE_DATA.map((chave) => (
                         <td key={chave} className="px-2.5 py-2.5 text-right">
@@ -258,7 +258,7 @@ export default async function PaginaControle({
                 <li key={linha.id} className="flex flex-col gap-2 rounded-[10px] border border-line bg-surface p-3.5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <Nome linha={linha} />
-                    <Etiqueta passo={linha.passo} />
+                    <Etiqueta linha={linha} hoje={hoje} />
                   </div>
 
                   <div className="flex flex-wrap gap-x-4 gap-y-1 text-[12px]">
