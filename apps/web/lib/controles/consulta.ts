@@ -53,6 +53,9 @@ export type LinhaDoControle = {
   /** Quando a analista confirmou a emissão. Nulo = ainda não, ou o cliente não tem a etapa. */
   emissaoConfirmadaEm: string | null;
 
+  /** O cliente faz a própria movimentação: só boleto e pagamento. */
+  movimentacaoPropria: boolean;
+
   /** A coleta por link deste mês. */
   coleta: Coleta;
 };
@@ -142,6 +145,7 @@ type LinhaDaView = {
   resent_after_check: boolean | null;
   confirm_date: string | null;
   issue_confirmed_at: string | null;
+  self_managed: boolean | null;
 };
 
 function paraLinha(v: LinhaDaView): LinhaDoControle {
@@ -188,6 +192,7 @@ function paraLinha(v: LinhaDaView): LinhaDoControle {
           }
         : null,
     emissaoConfirmadaEm: v.issue_confirmed_at,
+    movimentacaoPropria: v.self_managed === true,
     coleta: {
       temLink: v.has_collection_link === true,
       // O banco guarda o instante; a decisão de prazo é por DIA, e é assim que

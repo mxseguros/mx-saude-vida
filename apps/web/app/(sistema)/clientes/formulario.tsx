@@ -42,6 +42,7 @@ function valoresIniciais(cliente?: ClienteCompleto | null): Valores {
     // `"1"` e nao `true`: o estado do formulario e um mapa de strings, e ele
     // sobe para a rota como esta. O esquema aceita as duas formas.
     acompanhaPagamento: (cliente?.acompanhaPagamento ?? true) ? "1" : "",
+    movimentacaoPropria: cliente?.movimentacaoPropria ? "1" : "",
     canal: cliente?.canal ?? "whatsapp",
     gestorNome: cliente?.gestorNome ?? "",
     gestorCelular: cliente ? mascararTelefone(cliente.gestorCelular ?? "") : "",
@@ -104,7 +105,14 @@ export function FormularioCliente({
         return;
       }
 
-      aviso.mostrar(editando ? "Cliente salvo." : "Cliente cadastrado.");
+      const ajustados = Number(json?.data?.mesesAjustados ?? 0);
+      aviso.mostrar(
+        ajustados
+          ? `Cliente salvo. ${ajustados === 1 ? "O mês em aberto seguiu" : `${ajustados} meses em aberto seguiram`} para o boleto.`
+          : editando
+            ? "Cliente salvo."
+            : "Cliente cadastrado.",
+      );
       router.push(`/clientes/${json.data.id}`);
       router.refresh();
     } catch {
@@ -114,7 +122,8 @@ export function FormularioCliente({
     }
   }
 
-  const semMovimentacao = !valores.informarDia && !valores.corteDia;
+  const propria = valores.movimentacaoPropria === "1";
+  const semMovimentacao = !propria && !valores.informarDia && !valores.corteDia;
   const canal = valores.canal as Canal;
 
   return (
@@ -190,7 +199,35 @@ export function FormularioCliente({
           </p>
         </div>
 
-        <div className="grid items-start gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <div
+          className={`rounded-[8px] border px-3 py-3 ${propria ? "border-brand bg-accent-soft" : "border-line bg-surface-2"}`}
+        >
+          <CaixaDeSelecao
+            rotulo="O cliente faz a própria movimentação"
+            motivo="Ele informa quem entra e quem sai direto na seguradora. A MX não cobra planilha, não manda link de coleta e não controla corte."
+            checked={propria}
+            onChange={(e) => {
+              const ligado = e.target.checked;
+              setValores((v) => ({
+                ...v,
+                movimentacaoPropria: ligado ? "1" : "",
+                // Ficam só o boleto e a confirmação do pagamento: o pagamento
+                // passa a ser acompanhado, e as datas de coleta saem.
+                ...(ligado ? { acompanhaPagamento: "1", informarDia: "", corteDia: "", confirmarDia: "" } : {}),
+              }));
+            }}
+          />
+          {propria ? (
+            <p role="status" className="mt-2 text-[13px] leading-relaxed text-texto">
+              O mês começa <b className="font-[600]">esperando o boleto</b>. Ficam só duas etapas: anexar e enviar o
+              boleto, e confirmar o pagamento. Ao salvar, o mês em aberto já segue para o boleto.
+            </p>
+          ) : null}
+        </div>
+
+        <div className={`grid items-start gap-4 sm:grid-cols-2 ${propria ? "lg:grid-cols-4" : "lg:grid-cols-5"}`}>
+          {propria ? null : (
+          <>
           <Campo
             rotulo="Informar até"
             inputMode="numeric"
@@ -221,6 +258,8 @@ export function FormularioCliente({
             erro={erros.confirmarDia}
             dica="Só se a seguradora pede. Pode ficar em branco."
           />
+          </>
+          )}
           <Campo
             rotulo="Emissão do boleto"
             required

@@ -101,6 +101,9 @@ export function Nome({ linha }: { linha: LinhaDoControle }) {
       title={linha.observacoes ?? "Abrir o cadastro do cliente"}
     >
       {nomeCurto({ razaoSocial: linha.razaoSocial, nomeFantasia: linha.nomeFantasia })}
+      {linha.movimentacaoPropria ? (
+        <span className="mt-0.5 block text-[11.5px] font-[500] text-muted no-underline">movimentação própria</span>
+      ) : null}
     </Link>
   );
 }

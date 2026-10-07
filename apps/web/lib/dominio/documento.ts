@@ -149,3 +149,18 @@ export function pareceDocumento(termo: string): boolean {
   const so = termo.replace(/[.\-/\s]/g, "");
   return /^\d{4,14}$/.test(so);
 }
+
+/**
+ * Os CPFs e CNPJs de um texto colado (uma lista da planilha, com nomes e
+ * pontuação). Só os que têm dígito verificador certo, sem repetir, na ordem
+ * em que aparecem.
+ */
+export function extrairDocumentos(texto: string): string[] {
+  const achados = texto.match(/\d[\d./-]{9,19}\d/g) ?? [];
+  const vistos = new Set<string>();
+  for (const bruto of achados) {
+    const digitos = bruto.replace(/\D/g, "");
+    if ((digitos.length === 11 || digitos.length === 14) && documentoValido(digitos)) vistos.add(digitos);
+  }
+  return [...vistos];
+}

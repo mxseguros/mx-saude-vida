@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { TopoPagina } from "@/app/_admin/moldura";
 import { LinkBotao } from "@/componentes/ui/botao";
+import { MarcarEmLote } from "./marcar-em-lote";
 import { contarClientes, listarClientes } from "@/lib/clientes/consulta";
 import { nomeCurto, ROTULO_PRODUTO } from "@/lib/dominio/cliente";
 import { formatarDocumento } from "@/lib/dominio/documento";
@@ -36,7 +37,12 @@ export default async function PaginaClientes({
       <TopoPagina
         titulo="Clientes"
         contagem={lista.dados.length ? `${lista.dados.length} na lista` : undefined}
-        acoes={<LinkBotao href="/clientes/novo">+ Novo cliente</LinkBotao>}
+        acoes={
+          <span className="flex flex-wrap items-center gap-2.5">
+            <MarcarEmLote />
+            <LinkBotao href="/clientes/novo">+ Novo cliente</LinkBotao>
+          </span>
+        }
       />
 
       <div className="flex flex-col gap-4 p-4 sm:p-6">
@@ -113,6 +119,11 @@ export default async function PaginaClientes({
                         {!cliente.ativo ? (
                           <span className="ml-2 rounded-full bg-surface-3 px-2 py-0.5 text-[11px] text-muted">
                             inativo
+                          </span>
+                        ) : null}
+                        {cliente.movimentacaoPropria ? (
+                          <span className="ml-2 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] text-on-accent-soft">
+                            movimentação própria
                           </span>
                         ) : null}
                       </td>

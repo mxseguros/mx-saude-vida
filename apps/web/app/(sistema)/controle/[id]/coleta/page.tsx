@@ -51,6 +51,30 @@ export default async function PaginaDaColeta({ params }: { params: Promise<{ id:
   if (!controle.dados) notFound();
 
   const linha = controle.dados;
+
+  // Cliente que faz a própria movimentação não tem coleta: a tela diz o porquê
+  // e aponta onde mudar, em vez de abrir um formulário que não deveria existir.
+  if (linha.movimentacaoPropria) {
+    return (
+      <>
+        <TopoPagina titulo="Nova coleta de movimentação" voltar={{ href: "/controle", rotulo: "Voltar para o Controle" }} />
+        <div className="mx-auto flex w-full max-w-[760px] flex-col gap-3 p-4 sm:p-6">
+          <p role="status" className="rounded-[10px] border border-line bg-surface p-4 text-[13.5px] leading-relaxed text-texto">
+            <b className="font-[600]">Este cliente faz a própria movimentação</b> direto na seguradora. A MX não coleta
+            planilha nem manda link: o mês segue para o boleto e a confirmação do pagamento.
+          </p>
+          <p className="m-0 text-[13px] text-muted">
+            Se isso mudou, desmarque a opção em{" "}
+            <a href={`/clientes/${linha.clienteId}`} className="font-[600] text-heading underline underline-offset-2">
+              Regras do mês do cliente
+            </a>
+            .
+          </p>
+        </div>
+      </>
+    );
+  }
+
   const [apolice, eu] = await Promise.all([lerApoliceAtiva(linha.clienteId), perfilAtual()]);
   const cliente = nomeCurto({ razaoSocial: linha.razaoSocial, nomeFantasia: linha.nomeFantasia });
   const hoje = hojeSaoPaulo();

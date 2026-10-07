@@ -1,3 +1,4 @@
+import { aplicarNosMesesAbertos } from "@/lib/clientes/movimentacao-propria";
 import { erroJson, exigirEscrita, exigirPerfil, lerCorpo } from "@/lib/api";
 import { lerCliente } from "@/lib/clientes/consulta";
 import { editarCliente, inativarCliente, reativarCliente } from "@/lib/clientes/servico";
@@ -41,7 +42,12 @@ export async function PATCH(request: Request, contexto: { params: Promise<{ id: 
     return erroJson(status, codigo, mensagem, campo);
   }
 
-  return Response.json({ data: resultado.dados });
+  // Marcado "faz a própria movimentação": o mês em aberto já segue para o boleto.
+  const mesesAjustados = analise.dados.movimentacaoPropria
+    ? await aplicarNosMesesAbertos(id, sessao.perfil.id)
+    : 0;
+
+  return Response.json({ data: { ...resultado.dados, mesesAjustados } });
 }
 
 /**

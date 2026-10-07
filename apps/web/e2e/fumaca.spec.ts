@@ -172,6 +172,11 @@ test("marcar mensagem da fila como enviada exige sessão", async ({ request }) =
   expect([401, 503]).toContain(r.status());
 });
 
+test("marcar movimentação própria em lote exige sessão", async ({ request }) => {
+  const r = await request.post("/api/v1/clientes/movimentacao-propria", { data: { texto: "99.999.999/0001-91" } });
+  expect([401, 503]).toContain(r.status());
+});
+
 test("confirmar emissão exige sessão", async ({ request }) => {
   const r = await request.post("/api/v1/controles/00000000-0000-0000-0000-000000000000/emissao");
   expect([401, 503]).toContain(r.status());

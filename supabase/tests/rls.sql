@@ -486,6 +486,14 @@ select pg_temp.exigir_recusa(
   '23514'
 );
 
+-- Movimentacao propria nao convive com datas de coleta.
+select pg_temp.exigir_recusa(
+  $$update clients set self_managed = true, inform_day = 8, cutoff_day = 10
+     where id = 'b0000000-0000-0000-0000-000000000002'$$,
+  'movimentacao propria aceitou data de coleta',
+  '23514'
+);
+
 -- Tirar o link e tirar os dois campos, e isso tem que passar.
 update monthly_controls
    set collection_token = null, collection_expires_at = null

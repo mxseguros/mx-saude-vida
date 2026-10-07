@@ -67,7 +67,20 @@ const diaDoMes = (rotulo: string) =>
 const diaObrigatorio = (rotulo: string) =>
   diaDoMes(rotulo).refine((v): v is number => v !== null, { message: `${rotulo} é obrigatório.` });
 
-export const esquemaCliente = z
+/**
+ * Cliente que faz a própria movimentação (07/10): as datas de coleta não se
+ * aplicam a ele. Zeradas ANTES das regras, para um dia antigo esquecido no
+ * formulário não reprovar o cadastro nem voltar a abrir coleta.
+ */
+function semColetaSeMovimentacaoPropria(valor: unknown): unknown {
+  if (typeof valor !== "object" || valor === null) return valor;
+  const bruto = valor as Record<string, unknown>;
+  const flag = String(bruto.movimentacaoPropria ?? "").toLowerCase();
+  const ligado = bruto.movimentacaoPropria === true || ["1", "true", "sim", "on"].includes(flag);
+  return ligado ? { ...bruto, informarDia: "", corteDia: "", confirmarDia: "" } : valor;
+}
+
+export const esquemaCliente = z.preprocess(semColetaSeMovimentacaoPropria, z
   .object({
     razaoSocial: z.preprocess(texto, z.string().min(3, "Informe a razão social.").max(200)),
     nomeFantasia: opcional(120),
@@ -105,6 +118,8 @@ export const esquemaCliente = z
      * deixa de significar algo — e a tela diz isso.
      */
     acompanhaPagamento: booleanoDeFormulario,
+    /** Ele informa direto na seguradora: sem planilha, sem link, sem corte. */
+    movimentacaoPropria: booleanoDeFormulario,
 
     // Canal de aviso.
     canal: z.enum(CANAIS, { errorMap: () => ({ message: "Escolha o canal de aviso." }) }),
@@ -142,7 +157,7 @@ export const esquemaCliente = z
   .refine((c) => c.canal === "whatsapp" || c.gestorEmail !== null, {
     message: "Para avisar por e-mail, informe o e-mail do gestor.",
     path: ["gestorEmail"],
-  });
+  }));
 
 export type DadosDoCliente = z.infer<typeof esquemaCliente>;
 
